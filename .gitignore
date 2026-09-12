@@ -1,0 +1,6 @@
+gitignored
+.vscode
+
+backend/.env
+backend/data
+backend/drizzle
