@@ -1,4 +1,10 @@
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import {
+  integer,
+  primaryKey,
+  sqliteTable,
+  text,
+  unique,
+} from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
@@ -23,25 +29,65 @@ export const chats = sqliteTable("chats", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
 
-export const messages = sqliteTable("messages", {
-  id: text("id").primaryKey(),
-  chatId: text("chat_id").notNull(),
-  role: text("role").notNull(),
-  content: text("content").notNull(),
-  model: text("model").notNull(),
-  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
-});
-
 export const modelsSettings = sqliteTable("models_settings", {
   id: text("id").primaryKey(),
   modelName: text("model_name").notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
 
-export const attachments = sqliteTable("attachments", {
+export const messages = sqliteTable("messages", {
   id: text("id").primaryKey(),
-  messageId: text("message_id").notNull(),
-  path: text("path").notNull(),
-  type: text("type").notNull(), // "image" | "text" | "other"
+
+  chatId: text("chat_id").notNull(),
+
+  role: text("role").notNull(),
+
+  content: text("content").notNull(),
+
+  model: text("model").notNull(),
+
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
+
+export const attachments = sqliteTable(
+  "attachments",
+  {
+    id: text("id").primaryKey(),
+
+    userId: text("user_id").notNull(),
+
+    hash: text("hash").notNull(),
+
+    path: text("path").notNull(),
+
+    mimeType: text("mime_type").notNull(),
+
+    size: integer("size").notNull(),
+
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    unique("attachments_user_hash_unique").on(
+      table.userId,
+      table.hash,
+    ),
+  ],
+);
+
+export const messageAttachments = sqliteTable(
+  "message_attachments",
+  {
+    messageId: text("message_id")
+      .notNull()
+      .references(() => messages.id, { onDelete: "cascade" }),
+
+    attachmentId: text("attachment_id")
+      .notNull()
+      .references(() => attachments.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.messageId, table.attachmentId],
+    }),
+  ],
+);

@@ -397,10 +397,16 @@ export default function App() {
     <div className="flex min-h-screen">
       <aside className="fixed left-0 top-0 flex h-screen w-64 flex-col p-3">
         <button
-          className="text-left font-semibold"
+          className="my-1 h-10 w-[calc(100%-8px)] rounded-lg bg-neutral-800 p-2 text-left hover:bg-neutral-700"
           onClick={() => navigate("/")}
         >
           AI Chat
+        </button>
+        <button
+          className="my-1 h-10 w-[calc(100%-8px)] rounded-lg bg-neutral-800 p-2 text-left hover:bg-neutral-700"
+          onClick={() => navigate("/files")}
+        >
+          <span className="block truncate">Files</span>
         </button>
         <nav className="mt-4 flex-1 overflow-y-auto" aria-label="Chats">
           {chats.map((currentChat) => (
@@ -419,9 +425,10 @@ export default function App() {
         </nav>
         <button
           className="my-1 h-10 w-[calc(100%-8px)] rounded-lg bg-neutral-800 p-2 text-left hover:bg-neutral-700"
-          onClick={() => {
-            cookieStore.delete("token");
-            window.location.reload();
+          onClick={async () => {
+            await fetch("/api/v1/logout", { method: "DELETE" });
+
+            location.reload();
           }}
         >
           Logout

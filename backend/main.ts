@@ -21,6 +21,7 @@ import { db } from "./db/client.ts";
 import {
   attachments as attachs,
   chats,
+  messageAttachments,
   messages,
   sessions,
   users,
@@ -31,6 +32,8 @@ import { startAgent } from "./agents.ts";
 import { hash, verify } from "jsr:@felix/bcrypt";
 import { decodeHex, encodeHex } from "jsr:@std/encoding/hex";
 import "dotenv/config";
+
+Deno.mkdirSync("./data/attachments", { recursive: true });
 
 registerProvider(
   "ollama",
@@ -115,7 +118,7 @@ function parseDataUrl(dataUrl: string): {
   };
 }
 
-const app = new Hono<{ Variables: { userId: string } }>();
+const app = new Hono<{ Variables: { userId: string; sessionId: string } }>();
 
 app.use("/api/v1/*", async (c, next) => {
   const token = getCookie(c, "token");
@@ -147,6 +150,8 @@ app.use("/api/v1/*", async (c, next) => {
   }
 
   c.set("userId", session[0].userId);
+  c.set("sessionId", session[0].id);
+
   await next();
 });
 
@@ -196,7 +201,7 @@ app.post("/api/v1/chat", async (c) => {
     role: "user",
   });
 
-  const attachments = reqJson.attachments as string[];
+  const attachments = (reqJson.attachments ?? []) as string[];
 
   const images: string[] = [];
 
@@ -209,24 +214,42 @@ app.post("/api/v1/chat", async (c) => {
       images.push(parsed.base64);
     }
 
-    const id = randomUUID();
-
-    const ext = mime.extension(parsed.mimeType);
-
-    Deno.writeFileSync(
-      `./data/attachments/${id}.${ext}`,
-      Uint8Array.fromBase64(parsed.base64),
+    const fileBytes = Uint8Array.fromBase64(parsed.base64);
+    const attachmentHash = encodeHex(
+      await crypto.subtle.digest("SHA-256", fileBytes),
     );
+    const ext = mime.extension(parsed.mimeType);
+    const existingAttachment = await db.select().from(attachs).where(
+      and(
+        eq(attachs.userId, c.get("userId")),
+        eq(attachs.hash, attachmentHash),
+      ),
+    );
+    const attachmentId = existingAttachment[0]?.id ?? randomUUID();
 
-    await db.insert(attachs).values({
-      createdAt: new Date(),
-      id,
+    if (existingAttachment.length === 0) {
+      Deno.writeFileSync(
+        `./data/attachments/${attachmentId}.${ext}`,
+        fileBytes,
+      );
+
+      await db.insert(attachs).values({
+        createdAt: new Date(),
+        hash: attachmentHash,
+        id: attachmentId,
+        mimeType: parsed.mimeType,
+        path: `./data/attachments/${attachmentId}.${ext}`,
+        size: fileBytes.byteLength,
+        userId: c.get("userId"),
+      });
+    }
+
+    await db.insert(messageAttachments).values({
+      attachmentId,
       messageId,
-      path: `./data/attachments/${id}.${ext}`,
-      type: parsed.mimeType,
     });
 
-    attachmentsEndpoints.push(`/api/v1/attachment/${id}`);
+    attachmentsEndpoints.push(`/api/v1/attachment/${attachmentId}`);
   }
 
   const chatMessages = await db
@@ -241,14 +264,16 @@ app.post("/api/v1/chat", async (c) => {
   }[] = [];
 
   for (const msg of chatMessages) {
-    const chatAttachments = await db.select().from(attachs).where(
-      eq(attachs.messageId, msg.id),
-    );
+    const chatAttachments = await db
+      .select({ mimeType: attachs.mimeType, path: attachs.path })
+      .from(messageAttachments)
+      .innerJoin(attachs, eq(messageAttachments.attachmentId, attachs.id))
+      .where(eq(messageAttachments.messageId, msg.id));
 
     finalMessages.push({
       ...msg,
       images: chatAttachments.flatMap((img) => {
-        if (img.type.startsWith("image/")) {
+        if (img.mimeType.startsWith("image/")) {
           return [Deno.readFileSync(img.path).toBase64()];
         }
         return [];
@@ -415,14 +440,16 @@ app.get("/api/v1/chat/:id", async (c) => {
   }[] = [];
 
   for (const msg of chatMessages) {
-    const chatAttachments = await db.select().from(attachs).where(
-      eq(attachs.messageId, msg.id),
-    );
+    const chatAttachments = await db
+      .select({ id: attachs.id, mimeType: attachs.mimeType })
+      .from(messageAttachments)
+      .innerJoin(attachs, eq(messageAttachments.attachmentId, attachs.id))
+      .where(eq(messageAttachments.messageId, msg.id));
 
     finalMessages.push({
       ...msg,
       images: chatAttachments.flatMap((img) => {
-        if (img.type.startsWith("image/")) {
+        if (img.mimeType.startsWith("image/")) {
           return [`/api/v1/attachment/${img.id}`];
         }
         return [];
@@ -450,9 +477,12 @@ app.get("/api/v1/models", async (c) => {
 app.get("/api/v1/attachment/:id", async (c) => {
   const id = c.req.param().id;
 
-  const attachments = await db.select().from(attachs).where(
-    eq(attachs.id, id),
-  );
+  const attachments = await db
+    .select()
+    .from(attachs)
+    .where(
+      and(eq(attachs.id, id), eq(attachs.userId, c.get("userId"))),
+    );
 
   if (attachments.length < 1) {
     return c.status(404);
@@ -460,7 +490,9 @@ app.get("/api/v1/attachment/:id", async (c) => {
 
   const img = Deno.readFileSync(attachments[0].path);
 
-  return c.body(img.buffer);
+  return c.body(img.buffer, 200, {
+    "Content-Type": attachments[0].mimeType,
+  });
 });
 
 app.post("/api/auth/register", async (c) => {
@@ -500,7 +532,10 @@ app.post("/api/auth/register", async (c) => {
     sameSite: "Lax",
   });
 
-  const hashedToken = await crypto.subtle.digest("SHA-256", token);
+  const hashedToken = await crypto.subtle.digest(
+    "SHA-256",
+    token as Uint8Array<ArrayBuffer>,
+  );
 
   await db.insert(sessions).values({
     id: sessionId,
@@ -538,7 +573,10 @@ app.post("/api/auth/login", async (c) => {
     sameSite: "Lax",
   });
 
-  const hashedToken = await crypto.subtle.digest("SHA-256", token);
+  const hashedToken = await crypto.subtle.digest(
+    "SHA-256",
+    token as Uint8Array<ArrayBuffer>,
+  );
 
   await db.insert(sessions).values({
     id: sessionId,
@@ -548,6 +586,16 @@ app.post("/api/auth/login", async (c) => {
   });
 
   return c.json({ userId: user[0].id, sessionId });
+});
+
+app.delete("/api/v1/logout", async (c) => {
+  const sessionId = c.get("sessionId");
+
+  await db.delete(sessions).where(eq(sessions.id, sessionId));
+
+  deleteCookie(c, "token");
+
+  return c.redirect("/");
 });
 
 Deno.serve({ port: 3333 }, app.fetch);
