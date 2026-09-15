@@ -21,8 +21,8 @@ import {
 import { and, eq } from "drizzle-orm";
 import mime from "mime-types";
 import { startAgent } from "./agents.ts";
-import { hash, verify } from "jsr:@felix/bcrypt";
-import { decodeHex, encodeHex } from "jsr:@std/encoding/hex";
+import { hash, verify } from "bcrypt";
+import { decodeHex, encodeHex } from "@std/encoding/hex";
 import "dotenv/config";
 
 Deno.mkdirSync("./data/attachments", { recursive: true });

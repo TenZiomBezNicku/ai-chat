@@ -8,7 +8,9 @@
     "hono": "jsr:@hono/hono@^4.13.7",
     "mime-types": "npm:mime-types@^3.0.2",
     "ollama": "npm:ollama@^0.6.3",
-    "openai": "npm:openai@^7.15.0"
+    "openai": "npm:openai@^7.15.0",
+    "bcrypt": "jsr:@felix/bcrypt",
+    "@std/encoding": "jsr:@std/encoding"
   },
   "tasks": {
     "start": "deno run -A main.ts"
