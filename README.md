@@ -24,17 +24,17 @@ mv backend/.env.example backend/.env
 ```bash
 npm install
 ```
-4. Run frontend (in `frontend` directory):
+4. Build frontend (in `frontend` directory):
 
 ```bash
-npm run dev
+npm run build
 ```
-5. Run backend (in another terminal, in `backend` directory):
+5. Run backend (in `backend` directory):
 
 ```bash
 deno task start
 ```
-6. Go to the [http://localhost:5173/](http://localhost:5173/)
+6. Go to the [http://localhost:3333/](http://localhost:3333/)
 
 ### How to disable a backend
 
