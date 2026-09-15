@@ -149,6 +149,12 @@ app.use("/api/v1/*", async (c, next) => {
     return c.json({ error: "Invalid token" }, 401);
   }
 
+  if (session[0].expiresAt.getTime() >= Date.now()) {
+    await db.delete(sessions).where(eq(sessions.id, session[0].id));
+
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
   c.set("userId", session[0].userId);
   c.set("sessionId", session[0].id);
 
@@ -540,6 +546,7 @@ app.post("/api/auth/register", async (c) => {
   await db.insert(sessions).values({
     id: sessionId,
     createdAt: new Date(),
+    expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
     tokenHash: encodeHex(hashedToken),
     userId: id,
   });
@@ -581,6 +588,7 @@ app.post("/api/auth/login", async (c) => {
   await db.insert(sessions).values({
     id: sessionId,
     createdAt: new Date(),
+    expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
     tokenHash: encodeHex(hashedToken),
     userId: user[0].id,
   });

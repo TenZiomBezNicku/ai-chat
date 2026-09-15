@@ -19,6 +19,7 @@ export const sessions = sqliteTable("sessions", {
   userId: text("user_id").notNull(),
   tokenHash: text("token_hash").notNull().unique(),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
 });
 
 export const chats = sqliteTable("chats", {
@@ -67,10 +68,7 @@ export const attachments = sqliteTable(
     createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   },
   (table) => [
-    unique("attachments_user_hash_unique").on(
-      table.userId,
-      table.hash,
-    ),
+    unique("attachments_user_hash_unique").on(table.userId, table.hash),
   ],
 );
 
