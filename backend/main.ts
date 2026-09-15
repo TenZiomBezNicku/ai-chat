@@ -606,8 +606,9 @@ app.use(
   }),
 );
 
-app.get(
-  "*",
+app.on(
+  "GET",
+  ["/", "/c/:id", "/files"],
   serveStatic({
     path: "./dist/index.html",
   }),
