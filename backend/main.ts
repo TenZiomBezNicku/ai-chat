@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { streamText } from "hono/streaming";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
+import { serveStatic } from "hono/deno";
 import { chat, ChatMessage, models, registerProvider } from "./AI.ts";
 import OllamaProvider from "./aiProviders/ollama.ts";
 import { Ollama } from "ollama";
@@ -597,5 +598,19 @@ app.delete("/api/v1/logout", async (c) => {
 
   return c.redirect("/");
 });
+
+app.use(
+  "/*",
+  serveStatic({
+    root: "./dist",
+  }),
+);
+
+app.get(
+  "*",
+  serveStatic({
+    path: "./dist/index.html",
+  }),
+);
 
 Deno.serve({ port: 3333 }, app.fetch);

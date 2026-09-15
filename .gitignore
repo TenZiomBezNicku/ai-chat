@@ -4,3 +4,4 @@ gitignored
 backend/.env
 backend/data
 backend/drizzle
+backend/dist
