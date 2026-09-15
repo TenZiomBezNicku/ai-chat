@@ -190,6 +190,22 @@ export default function App() {
       });
   }, [handleUnauthorized]);
 
+  const refreshModels = useCallback(async () => {
+    try {
+      const loadedModels = await getModels();
+      setModels(loadedModels);
+    } catch (reason) {
+      if (reason instanceof UnauthorizedError) {
+        handleUnauthorized();
+        return;
+      }
+      setError(
+        reason instanceof Error ? reason.message : "Unable to load the models.",
+      );
+      navigate("/", true);
+    }
+  }, [handleUnauthorized, navigate]);
+
   useEffect(() => {
     refreshChats();
   }, [refreshChats]);
@@ -225,21 +241,8 @@ export default function App() {
   }, [chatId, conversation.chatId, handleUnauthorized, navigate]);
 
   useEffect(() => {
-    getModels()
-      .then((m) => setModels(m))
-      .catch((reason) => {
-        if (reason instanceof UnauthorizedError) {
-          handleUnauthorized();
-          return;
-        }
-        setError(
-          reason instanceof Error
-            ? reason.message
-            : "Unable to load the models.",
-        );
-        navigate("/", true);
-      });
-  }, [getModels]);
+    void refreshModels();
+  }, [refreshModels]);
 
   const authenticate = useCallback(
     async (mode: "login" | "register", username: string, password: string) => {
@@ -264,8 +267,9 @@ export default function App() {
       setIsAuthenticated(true);
       setError(null);
       await refreshChats();
+      await refreshModels();
     },
-    [refreshChats],
+    [refreshChats, refreshModels],
   );
 
   const send = useCallback(
