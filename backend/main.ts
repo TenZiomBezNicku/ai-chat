@@ -149,7 +149,7 @@ app.use("/api/v1/*", async (c, next) => {
     return c.json({ error: "Invalid token" }, 401);
   }
 
-  if (session[0].expiresAt.getTime() >= Date.now()) {
+  if (Date.now() >= session[0].expiresAt.getTime()) {
     await db.delete(sessions).where(eq(sessions.id, session[0].id));
 
     return c.json({ error: "Unauthorized" }, 401);
@@ -528,7 +528,7 @@ app.post("/api/auth/register", async (c) => {
     }).run();
   });
 
-  const token = randomBytes(512);
+  const token = randomBytes(64);
 
   const sessionId = randomUUID();
 
