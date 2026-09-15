@@ -563,7 +563,7 @@ app.post("/api/auth/login", async (c) => {
     return c.status(401);
   }
 
-  const token = randomBytes(512);
+  const token = randomBytes(64);
 
   const sessionId = randomUUID();
 
