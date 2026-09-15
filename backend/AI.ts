@@ -1,6 +1,3 @@
-import OpenAI from "openai";
-import OpenAIProvider from "./aiProviders/openai.ts";
-
 export interface ChatRequest {
   model: string;
   system?: string;

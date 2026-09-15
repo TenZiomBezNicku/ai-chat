@@ -1,14 +1,6 @@
 import { Hono } from "hono";
 import { streamText } from "hono/streaming";
-import {
-  deleteCookie,
-  generateCookie,
-  generateSignedCookie,
-  getCookie,
-  getSignedCookie,
-  setCookie,
-  setSignedCookie,
-} from "hono/cookie";
+import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { chat, ChatMessage, models, registerProvider } from "./AI.ts";
 import OllamaProvider from "./aiProviders/ollama.ts";
 import { Ollama } from "ollama";
