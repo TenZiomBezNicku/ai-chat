@@ -13,6 +13,7 @@ export type ChatMessage = {
   role: "user" | "assistant";
   content: string;
   model: string;
+  searchingInternet: boolean;
   images: string[];
 };
 type StreamEvent =
@@ -289,8 +290,20 @@ export default function App() {
             ...current,
             messages: [
               ...current.messages,
-              { role: "user", content: message, model, images: [] },
-              { role: "assistant", content: "", model, images: [] },
+              {
+                role: "user",
+                content: message,
+                model,
+                images: [],
+                searchingInternet: false,
+              },
+              {
+                role: "assistant",
+                content: "",
+                model,
+                images: [],
+                searchingInternet: false,
+              },
             ],
           };
         });
@@ -340,8 +353,20 @@ export default function App() {
               setConversation({
                 chatId: event.chatId,
                 messages: [
-                  { role: "user", content: message, model, images: [] },
-                  { role: "assistant", content: "", model, images: [] },
+                  {
+                    role: "user",
+                    content: message,
+                    model,
+                    images: [],
+                    searchingInternet: false,
+                  },
+                  {
+                    role: "assistant",
+                    content: "",
+                    model,
+                    images: [],
+                    searchingInternet: false,
+                  },
                 ],
               });
             }
@@ -355,6 +380,21 @@ export default function App() {
                   : currentChat,
               ),
             );
+          } else if (event.kind === "tool_call") {
+            if (event.tool === "web_search") {
+              setConversation((current) => {
+                const lastMessage = current.messages.at(-1);
+                if (!lastMessage || lastMessage.role !== "assistant")
+                  return current;
+                return {
+                  ...current,
+                  messages: [
+                    ...current.messages.slice(0, -1),
+                    { ...lastMessage, searchingInternet: true },
+                  ],
+                };
+              });
+            }
           } else if (event.kind === "attachments") {
           }
         };

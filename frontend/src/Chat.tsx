@@ -72,7 +72,7 @@ export default function Chat({
 
     const url = URL.createObjectURL(file);
     setImages((current) => [...current, { url, file }]);
-  };
+  }
 
   return (
     <div className="flex min-h-screen flex-1 justify-center pb-28">
@@ -86,6 +86,10 @@ export default function Chat({
             }
             key={`${currentMessage.role}-${index}`}
           >
+            {currentMessage.role === "assistant" &&
+            currentMessage.searchingInternet ? (
+              <p className="text-neutral-400">Searching the internet...</p>
+            ) : null}
             {currentMessage.images.map((image) => (
               <img
                 src={image}
@@ -146,7 +150,11 @@ export default function Chat({
           ))}
         </div>
         <div className="flex w-1/2 items-center rounded-4xl bg-neutral-700 p-4">
-          <button type="button" aria-label="Add attachment" onClick={openFilePicker}>
+          <button
+            type="button"
+            aria-label="Add attachment"
+            onClick={openFilePicker}
+          >
             <AddIcon />
           </button>
           <textarea
