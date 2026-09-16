@@ -627,4 +627,7 @@ app.on(
 
 setInterval(deleteExpiredSessions, 15 * 60 * 1000);
 
-Deno.serve({ port: 3333 }, app.fetch);
+Deno.serve({
+  port: Number(process.env.PORT ?? 3000),
+  hostname: process.env.HOSTNAME ?? "0.0.0.0",
+}, app.fetch);
