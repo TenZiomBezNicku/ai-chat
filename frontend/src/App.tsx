@@ -136,7 +136,7 @@ async function getModels() {
 
   if (response.status === 403 || response.status === 401)
     throw new UnauthorizedError();
-  if (!response.ok) throw new Error("Unable to load this chat.");
+  if (!response.ok) throw new Error("Unable to load model list.");
 
   const models = await response.json();
 
