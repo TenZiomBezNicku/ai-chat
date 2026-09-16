@@ -188,7 +188,8 @@ export async function models(
 export async function* chatStream(
   request: ChatRequest,
 ): AsyncIterable<ChatEvent> {
-  const [providerId, model] = request.model.split("/");
+  const [providerId, ...modelParts] = request.model.split("/");
+  const model = modelParts.join("/");
 
   const provider = providers.get(providerId);
 
