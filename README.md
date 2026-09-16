@@ -29,6 +29,12 @@ npm install
 ```bash
 npm run build
 ```
+5. Create database (in `backend` directory)
+
+```bash
+deno run -A npm:drizzle-kit generate
+deno run -A npm:drizzle-kit migrate
+```
 5. Run backend (in `backend` directory):
 
 ```bash
