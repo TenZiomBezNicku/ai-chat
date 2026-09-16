@@ -19,7 +19,7 @@ import {
   sessions,
   users,
 } from "./db/schema.ts";
-import { and, eq } from "drizzle-orm";
+import { and, eq, lte } from "drizzle-orm";
 import mime from "mime-types";
 import { startAgent } from "./agents.ts";
 import { hash, verify } from "bcrypt";
@@ -27,6 +27,12 @@ import { decodeHex, encodeHex } from "@std/encoding/hex";
 import "dotenv/config";
 
 Deno.mkdirSync("./data/attachments", { recursive: true });
+
+async function deleteExpiredSessions() {
+  await db.delete(sessions).where(lte(sessions.expiresAt, new Date()));
+}
+
+deleteExpiredSessions();
 
 registerProvider(
   "ollama",
@@ -613,5 +619,7 @@ app.on(
     path: "./dist/index.html",
   }),
 );
+
+setInterval(deleteExpiredSessions, 15 * 60 * 1000);
 
 Deno.serve({ port: 3333 }, app.fetch);
