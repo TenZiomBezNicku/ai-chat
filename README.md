@@ -40,7 +40,7 @@ deno run -A npm:drizzle-kit migrate
 ```bash
 deno task start
 ```
-7. Go to the [http://localhost:3333/](http://localhost:3333/)
+7. Go to [http://localhost:3000/](http://localhost:3000/) (the value `3000` corresponds to the port; it will be different if the PORT environment variable is defined - in that case, replace `3000` with the value of the PORT variable).
 
 ### How to disable a backend
 
