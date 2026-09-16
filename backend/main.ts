@@ -26,6 +26,9 @@ import { hash, verify } from "bcrypt";
 import { decodeHex, encodeHex } from "@std/encoding/hex";
 import "dotenv/config";
 
+const PRODUCTION_ENV = process.env.PRODUCTION === "true" ||
+  process.env.PRODUCTION === "1";
+
 Deno.mkdirSync("./data/attachments", { recursive: true });
 
 async function deleteExpiredSessions() {
@@ -535,6 +538,7 @@ app.post("/api/auth/register", async (c) => {
     httpOnly: true,
     path: "/",
     sameSite: "Lax",
+    secure: PRODUCTION_ENV,
   });
 
   const hashedToken = await crypto.subtle.digest(
@@ -577,6 +581,7 @@ app.post("/api/auth/login", async (c) => {
     httpOnly: true,
     path: "/",
     sameSite: "Lax",
+    secure: PRODUCTION_ENV,
   });
 
   const hashedToken = await crypto.subtle.digest(
