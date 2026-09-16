@@ -35,12 +35,12 @@ npm run build
 deno run -A npm:drizzle-kit generate
 deno run -A npm:drizzle-kit migrate
 ```
-5. Run backend (in `backend` directory):
+6. Run backend (in `backend` directory):
 
 ```bash
 deno task start
 ```
-6. Go to the [http://localhost:3333/](http://localhost:3333/)
+7. Go to the [http://localhost:3333/](http://localhost:3333/)
 
 ### How to disable a backend
 
