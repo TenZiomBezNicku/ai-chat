@@ -516,6 +516,23 @@ app.get("/api/v1/attachment/:id", async (c) => {
   });
 });
 
+app.get("/api/v1/files", async (c) => {
+  const userId = c.get("userId");
+
+  return c.json(
+    (await db.select().from(attachs).where(eq(attachs.userId, userId))).map(
+      (v) => {
+        return {
+          id: v.id,
+          createdAt: v.createdAt,
+          mimeType: v.mimeType,
+          size: v.size,
+        };
+      },
+    ),
+  );
+});
+
 app.delete("/api/v1/logout", async (c) => {
   const sessionId = c.get("sessionId");
 
