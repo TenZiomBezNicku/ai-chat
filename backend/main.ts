@@ -600,6 +600,7 @@ app.post("/api/auth/register", async (c) => {
     path: "/",
     sameSite: "Lax",
     secure: PRODUCTION_ENV,
+    maxAge: 14 * 24 * 60 * 60,
   });
 
   const hashedToken = await crypto.subtle.digest(
@@ -643,6 +644,7 @@ app.post("/api/auth/login", async (c) => {
     path: "/",
     sameSite: "Lax",
     secure: PRODUCTION_ENV,
+    maxAge: 14 * 24 * 60 * 60,
   });
 
   const hashedToken = await crypto.subtle.digest(
