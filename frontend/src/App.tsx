@@ -7,6 +7,7 @@ import {
 } from "react";
 import Chat from "./Chat";
 import NewChat from "./NewChat";
+import Files from "./Files";
 
 type ChatSummary = { id: string; title: string | null };
 export type ChatMessage = {
@@ -73,6 +74,20 @@ function chatIdFromPath(pathname: string) {
     ? pathname.slice(prefix.length)
     : "";
   return chatId && !chatId.includes("/") ? chatId : null;
+}
+
+function pathIsFiles(pathname: string) {
+  return false // This is temporary
+
+  if (pathname === "/files") {
+    return true;
+  }
+
+  if (pathname.startsWith("/files/")) {
+    return pathname.slice("/files/".length);
+  }
+
+  return false;
 }
 
 async function loadChats(signal?: AbortSignal): Promise<ChatSummary[]> {
@@ -485,23 +500,27 @@ export default function App() {
             {error}
           </p>
         )}
-        <select
-          className="fixed p-4"
-          onChange={(e) => {
-            setModel(e.target.value);
-          }}
-          value={model}
-        >
-          {models.map((m: any) => (
-            <option value={`${m.provider}/${m.name}`}>
-              {m.name} - {m.provider}
-            </option>
-          ))}
-        </select>
+        {pathIsFiles(pathname) === false ? (
+          <select
+            className="fixed p-4"
+            onChange={(e) => {
+              setModel(e.target.value);
+            }}
+            value={model}
+          >
+            {models.map((m: any) => (
+              <option value={`${m.provider}/${m.name}`}>
+                {m.name} - {m.provider}
+              </option>
+            ))}
+          </select>
+        ) : null}
         {chatId ? (
           <Chat send={send} messages={messages} isSending={isSending} />
-        ) : (
+        ) : pathIsFiles(pathname) === false ? (
           <NewChat send={send} isSending={isSending} />
+        ) : (
+          <Files />
         )}
       </main>
     </div>
