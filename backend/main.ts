@@ -27,7 +27,7 @@ import { decodeHex, encodeHex } from "@std/encoding/hex";
 import "dotenv/config";
 
 const PRODUCTION_ENV =
-  process.env.PRODUCTION === "true" || process.env.PRODUCTION === "1";
+  Deno.env.get("RODUCTION") === "true" || Deno.env.get("PRODUCTION") === "1";
 
 Deno.mkdirSync("./data/attachments", { recursive: true });
 
@@ -51,7 +51,7 @@ registerProvider(
 registerProvider("openai", new OpenAIProvider(new OpenAI()));
 
 const tavilyClient = tavily({
-  apiKey: process.env.TAVILY_API_KEY,
+  apiKey: Deno.env.get("TAVILY_API_KEY"),
 });
 
 registerTool(
@@ -681,8 +681,8 @@ setInterval(deleteExpiredSessions, 15 * 60 * 1000);
 
 Deno.serve(
   {
-    port: Number(process.env.PORT ?? 3000),
-    hostname: process.env.HOSTNAME ?? "0.0.0.0",
+    port: Number(Deno.env.get("PORT") ?? 3000),
+    hostname: Deno.env.get("HOSTNAME") ?? "0.0.0.0",
   },
   app.fetch,
 );
