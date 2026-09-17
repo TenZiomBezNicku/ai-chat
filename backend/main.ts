@@ -681,7 +681,7 @@ setInterval(deleteExpiredSessions, 15 * 60 * 1000);
 Deno.serve(
   {
     port: Number(Deno.env.get("PORT") ?? 3000),
-    hostname: Deno.env.get("HOSTNAME") ?? "0.0.0.0",
+    hostname: Deno.env.get("HOST") ?? "0.0.0.0",
   },
   app.fetch,
 );
