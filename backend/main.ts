@@ -24,7 +24,6 @@ import mime from "mime-types";
 import { startAgent } from "./agents.ts";
 import { hash, verify } from "bcrypt";
 import { decodeHex, encodeHex } from "@std/encoding/hex";
-import "dotenv/config";
 
 const PRODUCTION_ENV =
   Deno.env.get("RODUCTION") === "true" || Deno.env.get("PRODUCTION") === "1";
