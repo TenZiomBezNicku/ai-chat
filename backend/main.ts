@@ -533,6 +533,26 @@ app.get("/api/v1/files", async (c) => {
   );
 });
 
+app.get("/api/v1/files/:id", async (c) => {
+  const userId = c.get("userId");
+
+  return c.json(
+    (
+      await db
+        .select({
+          id: attachs.id,
+          createdAt: attachs.createdAt,
+          mimeType: attachs.mimeType,
+          size: attachs.size,
+        })
+        .from(attachs)
+        .where(
+          and(eq(attachs.userId, userId), eq(attachs.id, c.req.param("id"))),
+        )
+    )[0],
+  );
+});
+
 app.delete("/api/v1/logout", async (c) => {
   const sessionId = c.get("sessionId");
 
