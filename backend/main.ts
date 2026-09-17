@@ -26,8 +26,8 @@ import { hash, verify } from "bcrypt";
 import { decodeHex, encodeHex } from "@std/encoding/hex";
 import "dotenv/config";
 
-const PRODUCTION_ENV = process.env.PRODUCTION === "true" ||
-  process.env.PRODUCTION === "1";
+const PRODUCTION_ENV =
+  process.env.PRODUCTION === "true" || process.env.PRODUCTION === "1";
 
 Deno.mkdirSync("./data/attachments", { recursive: true });
 
@@ -37,10 +37,7 @@ async function deleteExpiredSessions() {
 
 deleteExpiredSessions();
 
-registerProvider(
-  "ollama",
-  new OllamaProvider(new Ollama()),
-);
+registerProvider("ollama", new OllamaProvider(new Ollama()));
 
 registerProvider(
   "ollama_cloud",
@@ -164,7 +161,24 @@ app.use("/api/v1/*", async (c, next) => {
 });
 
 app.post("/api/v1/chat", async (c) => {
-  const reqJson = await c.req.json();
+  const reqJson = (await c.req.json()) as {
+    chatId?: string;
+    model: string;
+    message: string;
+    attachments?: string[];
+  };
+
+  if (!reqJson.message)
+    return c.json(
+      { kind: "Bad request", error: 'Required "message" field was not given' },
+      400,
+    );
+
+  if (!reqJson.model)
+    return c.json(
+      { kind: "Bad request", error: 'Required "model" field was not given' },
+      400,
+    );
 
   let chatId = reqJson.chatId;
 
@@ -183,9 +197,12 @@ app.post("/api/v1/chat", async (c) => {
     genTitle = true;
   } else {
     if (
-      (await db.select().from(chats).where(
-        and(eq(chats.id, chatId), eq(chats.userId, c.get("userId"))),
-      )).length < 1
+      (
+        await db
+          .select()
+          .from(chats)
+          .where(and(eq(chats.id, chatId), eq(chats.userId, c.get("userId"))))
+      ).length < 1
     ) {
       return c.status(404);
     }
@@ -193,9 +210,7 @@ app.post("/api/v1/chat", async (c) => {
     await db
       .update(chats)
       .set({ updatedAt: new Date() })
-      .where(
-        and(eq(chats.id, chatId), eq(chats.userId, c.get("userId"))),
-      );
+      .where(and(eq(chats.id, chatId), eq(chats.userId, c.get("userId"))));
   }
 
   const messageId = randomUUID();
@@ -227,12 +242,15 @@ app.post("/api/v1/chat", async (c) => {
       await crypto.subtle.digest("SHA-256", fileBytes),
     );
     const ext = mime.extension(parsed.mimeType);
-    const existingAttachment = await db.select().from(attachs).where(
-      and(
-        eq(attachs.userId, c.get("userId")),
-        eq(attachs.hash, attachmentHash),
-      ),
-    );
+    const existingAttachment = await db
+      .select()
+      .from(attachs)
+      .where(
+        and(
+          eq(attachs.userId, c.get("userId")),
+          eq(attachs.hash, attachmentHash),
+        ),
+      );
     const attachmentId = existingAttachment[0]?.id ?? randomUUID();
 
     if (existingAttachment.length === 0) {
@@ -391,10 +409,7 @@ app.post("/api/v1/chat", async (c) => {
             "Your task is to generate a short chat title based on the user's message and the assistant's response. Do not use markdown",
         });
 
-        await db
-          .update(chats)
-          .set({ title })
-          .where(eq(chats.id, chatId));
+        await db.update(chats).set({ title }).where(eq(chats.id, chatId));
 
         await send({
           kind: "title",
@@ -488,9 +503,7 @@ app.get("/api/v1/attachment/:id", async (c) => {
   const attachments = await db
     .select()
     .from(attachs)
-    .where(
-      and(eq(attachs.id, id), eq(attachs.userId, c.get("userId"))),
-    );
+    .where(and(eq(attachs.id, id), eq(attachs.userId, c.get("userId"))));
 
   if (attachments.length < 1) {
     return c.status(404);
@@ -503,12 +516,22 @@ app.get("/api/v1/attachment/:id", async (c) => {
   });
 });
 
+app.delete("/api/v1/logout", async (c) => {
+  const sessionId = c.get("sessionId");
+
+  await db.delete(sessions).where(eq(sessions.id, sessionId));
+
+  deleteCookie(c, "token");
+
+  return c.redirect("/");
+});
+
 app.post("/api/auth/register", async (c) => {
   const { username, password } = await c.req.json();
 
   if (
-    (await db.select().from(users).where(eq(users.username, username)))
-      .length > 0
+    (await db.select().from(users).where(eq(users.username, username))).length >
+    0
   ) {
     return c.status(409);
   }
@@ -518,16 +541,18 @@ app.post("/api/auth/register", async (c) => {
   const passwordHash = await hash(password);
 
   db.transaction((tx) => {
-    const hasUsers = tx.select({ id: users.id }).from(users).limit(1).all()
-      .length > 0;
+    const hasUsers =
+      tx.select({ id: users.id }).from(users).limit(1).all().length > 0;
 
-    tx.insert(users).values({
-      createdAt: new Date(),
-      id,
-      passwordHash,
-      username,
-      role: hasUsers ? "user" : "admin",
-    }).run();
+    tx.insert(users)
+      .values({
+        createdAt: new Date(),
+        id,
+        passwordHash,
+        username,
+        role: hasUsers ? "user" : "admin",
+      })
+      .run();
   });
 
   const token = randomBytes(64);
@@ -600,16 +625,6 @@ app.post("/api/auth/login", async (c) => {
   return c.json({ userId: user[0].id, sessionId });
 });
 
-app.delete("/api/v1/logout", async (c) => {
-  const sessionId = c.get("sessionId");
-
-  await db.delete(sessions).where(eq(sessions.id, sessionId));
-
-  deleteCookie(c, "token");
-
-  return c.redirect("/");
-});
-
 app.use(
   "/*",
   serveStatic({
@@ -627,7 +642,10 @@ app.on(
 
 setInterval(deleteExpiredSessions, 15 * 60 * 1000);
 
-Deno.serve({
-  port: Number(process.env.PORT ?? 3000),
-  hostname: process.env.HOSTNAME ?? "0.0.0.0",
-}, app.fetch);
+Deno.serve(
+  {
+    port: Number(process.env.PORT ?? 3000),
+    hostname: process.env.HOSTNAME ?? "0.0.0.0",
+  },
+  app.fetch,
+);
