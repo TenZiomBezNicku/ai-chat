@@ -1,29 +1,44 @@
 import OpenAI from "openai";
-import {
-  AIProvider,
-  ChatEvent,
-  ChatMessage,
-  ToolDefinition,
-} from "../AI.ts";
+import { LLMProvider, ChatEvent, ChatMessage, ToolDefinition } from "../AI.ts";
 
-function toOpenAIInput(messages: ChatMessage[]): OpenAI.Responses.ResponseInput {
+function toOpenAIInput(
+  messages: ChatMessage[],
+): OpenAI.Responses.ResponseInput {
   const input = messages.flatMap((message): unknown[] => {
     if (message.role === "tool") {
-      return [{
-        type: "function_call_output" as const,
-        call_id: message.toolCallId,
-        output: message.content,
-      }];
+      return [
+        {
+          type: "function_call_output" as const,
+          call_id: message.toolCallId,
+          output: message.content,
+        },
+      ];
     }
 
     if (message.role === "assistant" && message.toolCalls?.length) {
+      const content = message.content
+        ? [
+            {
+              type: "output_text" as const,
+              text: message.content,
+            },
+          ]
+        : [];
+
+      const imageContent = (message.images ?? []).map((image) => ({
+        type: "input_image" as const,
+        image_url: `data:image/png;base64,${image}`,
+      }));
+
       return [
-        ...(message.content
-          ? [{
-            type: "message" as const,
-            role: "assistant" as const,
-            content: message.content,
-          }]
+        ...(content.length || imageContent.length
+          ? [
+              {
+                type: "message" as const,
+                role: "assistant" as const,
+                content: [...content, ...imageContent],
+              },
+            ]
           : []),
         ...message.toolCalls.map((toolCall) => ({
           type: "function_call" as const,
@@ -34,10 +49,21 @@ function toOpenAIInput(messages: ChatMessage[]): OpenAI.Responses.ResponseInput 
       ];
     }
 
-    return [{
-      role: message.role,
-      content: message.content,
-    }];
+    const imageContent = (message.images ?? []).map((image) => ({
+      type: "input_image" as const,
+      image_url: `data:image/png;base64,${image}`,
+    }));
+
+    const textContent = message.content
+      ? [{ type: "input_text" as const, text: message.content }]
+      : [];
+
+    return [
+      {
+        role: message.role,
+        content: [...textContent, ...imageContent],
+      },
+    ];
   });
 
   return input as OpenAI.Responses.ResponseInput;
@@ -55,7 +81,7 @@ function toOpenAIResponsesTools(
   }));
 }
 
-export default class OpenAIProvider implements AIProvider {
+export default class OpenAIProvider implements LLMProvider {
   id = "openai-responses";
   capabilities = {
     streaming: true,
@@ -83,10 +109,13 @@ export default class OpenAIProvider implements AIProvider {
     tools?: ToolDefinition[],
   ): AsyncIterable<ChatEvent> {
     const input: OpenAI.Responses.ResponseInput = system
-      ? [{
-        content: system,
-        role: "system",
-      }, ...toOpenAIInput(messages)]
+      ? [
+          {
+            content: system,
+            role: "system",
+          },
+          ...toOpenAIInput(messages),
+        ]
       : toOpenAIInput(messages);
 
     let processedTools: OpenAI.Responses.Tool[] | undefined = undefined;
@@ -132,10 +161,13 @@ export default class OpenAIProvider implements AIProvider {
     system?: string,
   ): Promise<string> {
     const input: OpenAI.Responses.ResponseInput = system
-      ? [{
-        content: system,
-        role: "system",
-      }, ...toOpenAIInput(messages)]
+      ? [
+          {
+            content: system,
+            role: "system",
+          },
+          ...toOpenAIInput(messages),
+        ]
       : toOpenAIInput(messages);
 
     const res = await this.client.responses.create({

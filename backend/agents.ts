@@ -7,11 +7,23 @@ import {
 } from "./AI.ts";
 
 const tools: ToolDefinition[] = [];
-const functions: Map<string, (args: string) => Promise<string> | string> =
-  new Map();
+const functions: Map<
+  string,
+  (
+    args: string,
+    chatId: string,
+    userId: string,
+    messageId: string,
+  ) => Promise<string> | string
+> = new Map();
 
 export function registerTool(
-  func: (args: string) => Promise<string> | string,
+  func: (
+    args: string,
+    chatId: string,
+    userId: string,
+    messageId: string,
+  ) => Promise<string> | string,
   tool: ToolDefinition,
 ) {
   if (functions.has(tool.name)) {
@@ -25,6 +37,9 @@ export function registerTool(
 export async function* startAgent(
   messages: ChatMessage[],
   model: string,
+  chatId: string,
+  userId: string,
+  messageId: string,
   maxTurns: number = 6,
   system?: string,
 ): AsyncIterable<ChatEvent> {
@@ -68,6 +83,8 @@ export async function* startAgent(
     }
 
     for (const toolCall of toolCalls) {
+      console.log(toolCall);
+
       const func = functions.get(toolCall.name);
 
       if (!func) {
@@ -76,7 +93,12 @@ export async function* startAgent(
       }
 
       try {
-        const result = await func(toolCall.arguments);
+        const result = await func(
+          toolCall.arguments,
+          chatId,
+          userId,
+          messageId,
+        );
 
         history.push({
           role: "tool",

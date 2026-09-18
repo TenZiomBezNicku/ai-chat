@@ -7,21 +7,21 @@ export interface ChatRequest {
 
 export type ChatMessage =
   | {
-    role: "user";
-    content: string;
-    images?: string[];
-  }
+      role: "user";
+      content: string;
+      images?: string[];
+    }
   | {
-    role: "assistant";
-    content: string;
-    images?: string[];
-    toolCalls?: ToolCall[];
-  }
+      role: "assistant";
+      content: string;
+      images?: string[];
+      toolCalls?: ToolCall[];
+    }
   | {
-    role: "tool";
-    content: string;
-    toolCallId: string;
-  };
+      role: "tool";
+      content: string;
+      toolCallId: string;
+    };
 
 export interface ToolCall {
   id: string;
@@ -31,26 +31,26 @@ export interface ToolCall {
 
 export type ChatEvent =
   | {
-    type: "text";
-    text: string;
-  }
+      type: "text";
+      text: string;
+    }
   | {
-    type: "reasoning";
-    text: string;
-  }
+      type: "reasoning";
+      text: string;
+    }
   | {
-    type: "tool_call";
-    id: string;
-    name: string;
-    arguments: string;
-  }
+      type: "tool_call";
+      id: string;
+      name: string;
+      arguments: string;
+    }
   | {
-    type: "done";
-  }
+      type: "done";
+    }
   | {
-    type: "error";
-    error: string;
-  };
+      type: "error";
+      error: string;
+    };
 
 export interface ToolDefinition {
   name: string;
@@ -121,7 +121,7 @@ export interface JSONSchemaNull extends JSONSchemaBase {
   type: "null";
 }
 
-export interface AIProvider {
+export interface LLMProvider {
   readonly id: string;
 
   readonly capabilities: {
@@ -147,17 +147,31 @@ export interface AIProvider {
   models(): Promise<string[]>;
 }
 
-const providers: Map<string, AIProvider> = new Map();
+export interface ImgGenProvider {
+  readonly id: string;
 
-export function registerProvider(id: string, provider: AIProvider) {
-  providers.set(id, provider);
+  genImage(
+    model: string,
+    prompt: string,
+  ): Promise<{ path: string; id: string } | undefined>;
+}
+
+const llmProviders: Map<string, LLMProvider> = new Map();
+const imgGenProviders: Map<string, ImgGenProvider> = new Map();
+
+export function registerLLMProvider(id: string, provider: LLMProvider) {
+  llmProviders.set(id, provider);
+}
+
+export function registerImgGenProvider(id: string, provider: ImgGenProvider) {
+  imgGenProviders.set(id, provider);
 }
 
 export async function models(
   provider?: string,
 ): Promise<{ provider: string; name: string }[]> {
   if (provider) {
-    const p = providers.get(provider);
+    const p = llmProviders.get(provider);
 
     if (!p) throw new Error("Invalid Provider");
 
@@ -173,7 +187,7 @@ export async function models(
 
   const models: { provider: string; name: string }[] = [];
 
-  for (const p of providers) {
+  for (const p of llmProviders) {
     (await p[1].models()).forEach((m) => {
       models.push({
         name: m,
@@ -191,7 +205,7 @@ export async function* chatStream(
   const [providerId, ...modelParts] = request.model.split("/");
   const model = modelParts.join("/");
 
-  const provider = providers.get(providerId);
+  const provider = llmProviders.get(providerId);
 
   if (provider) {
     const response = provider.chatStream(
@@ -213,14 +227,26 @@ export function chat(request: ChatRequest): Promise<string> {
   const [providerId, ...modelParts] = request.model.split("/");
   const model = modelParts.join("/");
 
-  const provider = providers.get(providerId);
+  const provider = llmProviders.get(providerId);
 
   if (provider) {
-    return provider.chat(
-      model,
-      request.messages,
-      request.system,
-    );
+    return provider.chat(model, request.messages, request.system);
+  }
+
+  throw new Error("Provider not found!");
+}
+
+export function genImage(
+  prompt: string,
+  model: string,
+): Promise<{ path: string; id: string } | undefined> {
+  const [providerId, ...modelParts] = model.split("/");
+  const m = modelParts.join("/");
+
+  const provider = imgGenProviders.get(providerId);
+
+  if (provider) {
+    return provider.genImage(m, prompt);
   }
 
   throw new Error("Provider not found!");

@@ -1,5 +1,5 @@
 import { type Message, Ollama, type Tool } from "ollama";
-import { AIProvider, ChatEvent, ChatMessage, ToolDefinition } from "../AI.ts";
+import { ChatEvent, ChatMessage, LLMProvider, ToolDefinition } from "../AI.ts";
 
 function toOllamaMessage(message: ChatMessage): Message {
   if (message.role === "tool") {
@@ -19,21 +19,15 @@ function toOllamaMessage(message: ChatMessage): Message {
           arguments: JSON.parse(toolCall.arguments) as Record<string, unknown>,
         },
       })),
+      images: message.images?.map((img) => Uint8Array.fromBase64(img)),
     };
   }
 
-  if (message.role === "user") {
-    return {
-      role: message.role,
-      content: message.content,
-      images: message.images,
-    };
-  } else {
-    return {
-      role: message.role,
-      content: message.content,
-    };
-  }
+  return {
+    role: message.role,
+    content: message.content,
+      images: message.images?.map((img) => Uint8Array.fromBase64(img)),
+  };
 }
 
 function toOllamaTools(tools: ToolDefinition[]): Tool[] {
@@ -47,7 +41,7 @@ function toOllamaTools(tools: ToolDefinition[]): Tool[] {
   }));
 }
 
-export default class OllamaProvider implements AIProvider {
+export default class OllamaProvider implements LLMProvider {
   id = "ollama";
   capabilities = {
     streaming: true,

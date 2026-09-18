@@ -2,10 +2,18 @@ import { Hono } from "hono";
 import { streamText } from "hono/streaming";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { serveStatic } from "hono/deno";
-import { chat, ChatMessage, models, registerProvider } from "./AI.ts";
-import OllamaProvider from "./aiProviders/ollama.ts";
+import {
+  chat,
+  ChatMessage,
+  genImage,
+  models,
+  registerImgGenProvider,
+  registerLLMProvider,
+} from "./AI.ts";
+import OllamaProvider from "./llmProviders/ollama.ts";
 import { Ollama } from "ollama";
-import OpenAIProvider from "./aiProviders/openai.ts";
+import OpenAILLMProvider from "./llmProviders/openai.ts";
+import OpenAIImgGenProvider from "./imgGenProviders/openai.ts";
 import { OpenAI } from "openai/client.mjs";
 import { tavily } from "@tavily/core";
 import { registerTool } from "./agents.ts";
@@ -24,9 +32,10 @@ import mime from "mime-types";
 import { startAgent } from "./agents.ts";
 import { hash, verify } from "bcrypt";
 import { decodeHex, encodeHex } from "@std/encoding/hex";
+import { error } from "node:console";
 
 const PRODUCTION_ENV =
-  Deno.env.get("RODUCTION") === "true" || Deno.env.get("PRODUCTION") === "1";
+  Deno.env.get("PRODUCTION") === "true" || Deno.env.get("PRODUCTION") === "1";
 
 Deno.mkdirSync("./data/attachments", { recursive: true });
 
@@ -36,9 +45,9 @@ async function deleteExpiredSessions() {
 
 deleteExpiredSessions();
 
-registerProvider("ollama", new OllamaProvider(new Ollama()));
+// registerLLMProvider("ollama", new OllamaProvider(new Ollama()));
 
-registerProvider(
+registerLLMProvider(
   "ollama_cloud",
   new OllamaProvider(
     new Ollama({
@@ -47,7 +56,9 @@ registerProvider(
   ),
 );
 
-registerProvider("openai", new OpenAIProvider(new OpenAI()));
+registerLLMProvider("openai", new OpenAILLMProvider(new OpenAI()));
+
+registerImgGenProvider("openai", new OpenAIImgGenProvider(new OpenAI()));
 
 const tavilyClient = tavily({
   apiKey: Deno.env.get("TAVILY_API_KEY"),
@@ -95,6 +106,94 @@ registerTool(
       type: "object",
       properties: { query: { type: "string", description: "Search query" } },
       required: ["query"],
+      additionalProperties: false,
+    },
+  },
+);
+
+registerTool(
+  async (args, chatId, userId, messageId) => {
+    const { prompt } = JSON.parse(args);
+
+    const result = await genImage(prompt, "openai/gpt-image-2");
+
+    if (!result) {
+      return JSON.stringify({
+        error: "An unknown error occurred while generating the image.",
+      });
+    }
+
+    const imgFile = await Deno.readFile(result.path);
+
+    const messageExists = await db
+      .select()
+      .from(messages)
+      .where(eq(messages.id, messageId));
+
+    if (messageExists.length === 0) {
+      await db.insert(messages).values({
+        chatId,
+        content: "",
+        createdAt: new Date(),
+        id: messageId,
+        model: "image-generation",
+        role: "assistant",
+      });
+    }
+
+    const existingAttachment = await db
+      .select()
+      .from(attachs)
+      .where(eq(attachs.id, result.id));
+
+    if (existingAttachment.length === 0) {
+      await db.insert(attachs).values({
+        createdAt: new Date(),
+        path: result.path,
+        id: result.id,
+        mimeType: "image/png",
+        size: imgFile.byteLength,
+        hash: encodeHex(await crypto.subtle.digest("SHA-256", imgFile)),
+        userId,
+      });
+    }
+
+    const existingLink = await db
+      .select()
+      .from(messageAttachments)
+      .where(
+        and(
+          eq(messageAttachments.messageId, messageId),
+          eq(messageAttachments.attachmentId, result.id),
+        ),
+      );
+
+    if (existingLink.length === 0) {
+      await db.insert(messageAttachments).values({
+        attachmentId: result.id,
+        messageId,
+      });
+    }
+
+    const imageBase64 = Deno.readFileSync(result.path).toBase64();
+
+    return JSON.stringify({
+      message: "Success! Image will be attached to your response.",
+      imageBase64,
+    });
+  },
+  {
+    name: "image_gen",
+    description: "Generate an image using a prompt",
+    parameters: {
+      type: "object",
+      properties: {
+        prompt: {
+          type: "string",
+          description: "Prompt for image generation model",
+        },
+      },
+      required: ["prompt"],
       additionalProperties: false,
     },
   },
@@ -336,10 +435,22 @@ app.post("/api/v1/chat", async (c) => {
       attachments: attachmentsEndpoints,
     });
 
+    await db.insert(messages).values({
+      chatId,
+      content: "",
+      createdAt: new Date(),
+      id: assistantMessageId,
+      model: reqJson.model,
+      role: "assistant",
+    });
+
     try {
       const response = startAgent(
         finalMessages as ChatMessage[],
         reqJson.model,
+        chatId,
+        c.get("userId"),
+        assistantMessageId,
         16,
       );
 
@@ -386,14 +497,14 @@ app.post("/api/v1/chat", async (c) => {
         }
       }
 
-      await db.insert(messages).values({
-        chatId,
-        content: res,
-        createdAt: new Date(),
-        id: assistantMessageId,
-        model: reqJson.model,
-        role: "assistant",
-      });
+      await db
+        .update(messages)
+        .set({
+          content: res,
+          createdAt: new Date(),
+          model: reqJson.model,
+        })
+        .where(eq(messages.id, assistantMessageId));
 
       if (genTitle) {
         const title = await chat({
