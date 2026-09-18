@@ -8,6 +8,7 @@ import {
 import Chat from "./Chat";
 import NewChat from "./NewChat";
 import Files from "./Files";
+import AdminPanel from "./AdminPanel";
 
 type ChatSummary = { id: string; title: string | null };
 export type ChatMessage = {
@@ -77,7 +78,7 @@ function chatIdFromPath(pathname: string) {
 }
 
 function pathIsFiles(pathname: string) {
-  return false // This is temporary
+  return false; // This is temporary
 
   if (pathname === "/files") {
     return true;
@@ -87,6 +88,11 @@ function pathIsFiles(pathname: string) {
     return pathname.slice("/files/".length);
   }
 
+  return false;
+}
+
+function pathIsAdmin(pathname: string) {
+  if (pathname == "/admin") return true;
   return false;
 }
 
@@ -174,6 +180,11 @@ export default function App() {
   const [isSending, setIsSending] = useState(false);
   const [models, setModels] = useState([]);
   const [model, setModel] = useState("ollama/gemma4:e4b");
+  const [me, setMe] = useState<{
+    id: string;
+    username: string;
+    role: string;
+  } | null>(null);
   const sendingRef = useRef(false);
   const chatId = chatIdFromPath(pathname);
   const messages = conversation.chatId === chatId ? conversation.messages : [];
@@ -222,6 +233,29 @@ export default function App() {
     }
   }, [handleUnauthorized, navigate]);
 
+  const loadCurrentUser = useCallback(async () => {
+    try {
+      const res = await fetch("/api/v1/me", { credentials: "include" });
+
+      if (res.status === 403 || res.status === 401) {
+        setIsAuthenticated(false);
+        setMe(null);
+        return null;
+      }
+
+      const json = await res.json();
+      setMe(json);
+      return json as {
+        id: string;
+        username: string;
+        role: string;
+      } | null;
+    } catch {
+      setMe(null);
+      return null;
+    }
+  }, []);
+
   useEffect(() => {
     refreshChats();
   }, [refreshChats]);
@@ -257,8 +291,14 @@ export default function App() {
   }, [chatId, conversation.chatId, handleUnauthorized, navigate]);
 
   useEffect(() => {
+    if (!isAuthenticated) return;
     void refreshModels();
-  }, [refreshModels]);
+  }, [isAuthenticated, refreshModels]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    void loadCurrentUser();
+  }, [isAuthenticated, loadCurrentUser]);
 
   const authenticate = useCallback(
     async (mode: "login" | "register", username: string, password: string) => {
@@ -284,8 +324,9 @@ export default function App() {
       setError(null);
       await refreshChats();
       await refreshModels();
+      await loadCurrentUser();
     },
-    [refreshChats, refreshModels],
+    [loadCurrentUser, refreshChats, refreshModels],
   );
 
   const send = useCallback(
@@ -482,6 +523,16 @@ export default function App() {
             </button>
           ))}
         </nav>
+        {me?.role === "admin" ? (
+          <button
+            className="my-1 h-10 w-[calc(100%-8px)] rounded-lg bg-neutral-800 p-2 text-left hover:bg-neutral-700"
+            onClick={() => {
+              navigate("/admin");
+            }}
+          >
+            Admin Panel
+          </button>
+        ) : null}
         <button
           className="my-1 h-10 w-[calc(100%-8px)] rounded-lg bg-neutral-800 p-2 text-left hover:bg-neutral-700"
           onClick={async () => {
@@ -500,7 +551,7 @@ export default function App() {
             {error}
           </p>
         )}
-        {pathIsFiles(pathname) === false ? (
+        {!(pathIsAdmin(pathname) || pathIsFiles(pathname)) ? (
           <select
             className="fixed p-4"
             onChange={(e) => {
@@ -517,10 +568,12 @@ export default function App() {
         ) : null}
         {chatId ? (
           <Chat send={send} messages={messages} isSending={isSending} />
-        ) : pathIsFiles(pathname) === false ? (
-          <NewChat send={send} isSending={isSending} />
-        ) : (
+        ) : pathIsFiles(pathname) ? (
           <Files />
+        ) : pathIsAdmin(pathname) ? (
+          <AdminPanel />
+        ) : (
+          <NewChat send={send} isSending={isSending} />
         )}
       </main>
     </div>

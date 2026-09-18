@@ -36,6 +36,12 @@ export const modelsSettings = sqliteTable("models_settings", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
 
+export const config = sqliteTable("config", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
 export const messages = sqliteTable("messages", {
   id: text("id").primaryKey(),
 

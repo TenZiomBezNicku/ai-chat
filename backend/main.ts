@@ -167,17 +167,19 @@ app.post("/api/v1/chat", async (c) => {
     attachments?: string[];
   };
 
-  if (!reqJson.message)
+  if (!reqJson.message) {
     return c.json(
       { kind: "Bad request", error: 'Required "message" field was not given' },
       400,
     );
+  }
 
-  if (!reqJson.model)
+  if (!reqJson.model) {
     return c.json(
       { kind: "Bad request", error: 'Required "model" field was not given' },
       400,
     );
+  }
 
   let chatId = reqJson.chatId;
 
@@ -552,6 +554,18 @@ app.get("/api/v1/files/:id", async (c) => {
   );
 });
 
+app.get("/api/v1/me", async (c) => {
+  const userId = c.get("userId");
+
+  const res = await db.select({
+    id: users.id,
+    role: users.role,
+    username: users.username,
+  }).from(users).where(eq(users.id, userId));
+
+  return c.json(res[0]);
+});
+
 app.delete("/api/v1/logout", async (c) => {
   const sessionId = c.get("sessionId");
 
@@ -567,7 +581,7 @@ app.post("/api/auth/register", async (c) => {
 
   if (
     (await db.select().from(users).where(eq(users.username, username))).length >
-    0
+      0
   ) {
     return c.status(409);
   }
