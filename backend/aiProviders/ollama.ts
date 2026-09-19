@@ -1,5 +1,11 @@
 import { type Message, Ollama, type Tool } from "ollama";
-import { AIProvider, ChatEvent, ChatMessage, ToolDefinition } from "../AI.ts";
+import {
+  AIProvider,
+  ChatEvent,
+  ChatMessage,
+  providerTypes,
+  ToolDefinition,
+} from "../AI.ts";
 
 function toOllamaMessage(message: ChatMessage): Message {
   if (message.role === "tool") {
@@ -48,7 +54,6 @@ function toOllamaTools(tools: ToolDefinition[]): Tool[] {
 }
 
 export default class OllamaProvider implements AIProvider {
-  id = "ollama";
   capabilities = {
     streaming: true,
     tools: true,
@@ -58,8 +63,11 @@ export default class OllamaProvider implements AIProvider {
 
   private client: Ollama;
 
-  public constructor(client: Ollama) {
-    this.client = client;
+  public constructor(baseUrl: string, apiKey?: string) {
+    this.client = new Ollama({
+      host: baseUrl,
+      headers: apiKey ? { "Authorization": `Bearer ${apiKey}` } : undefined,
+    });
   }
 
   async models(): Promise<string[]> {
@@ -131,3 +139,5 @@ export default class OllamaProvider implements AIProvider {
     return res.message.content;
   }
 }
+
+providerTypes.set("ollama", OllamaProvider);

@@ -122,8 +122,6 @@ export interface JSONSchemaNull extends JSONSchemaBase {
 }
 
 export interface AIProvider {
-  readonly id: string;
-
   readonly capabilities: {
     streaming: boolean;
     tools: boolean;
@@ -146,6 +144,11 @@ export interface AIProvider {
 
   models(): Promise<string[]>;
 }
+
+export const providerTypes: Map<
+  string,
+  new (baseUrl: string, apiKey?: string) => AIProvider
+> = new Map();
 
 const providers: Map<string, AIProvider> = new Map();
 

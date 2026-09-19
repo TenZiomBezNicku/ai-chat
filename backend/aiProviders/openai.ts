@@ -3,10 +3,13 @@ import {
   AIProvider,
   ChatEvent,
   ChatMessage,
+  providerTypes,
   ToolDefinition,
 } from "../AI.ts";
 
-function toOpenAIInput(messages: ChatMessage[]): OpenAI.Responses.ResponseInput {
+function toOpenAIInput(
+  messages: ChatMessage[],
+): OpenAI.Responses.ResponseInput {
   const input = messages.flatMap((message): unknown[] => {
     if (message.role === "tool") {
       return [{
@@ -56,7 +59,6 @@ function toOpenAIResponsesTools(
 }
 
 export default class OpenAIProvider implements AIProvider {
-  id = "openai-responses";
   capabilities = {
     streaming: true,
     tools: true,
@@ -66,8 +68,8 @@ export default class OpenAIProvider implements AIProvider {
 
   private client: OpenAI;
 
-  public constructor(client: OpenAI) {
-    this.client = client;
+  public constructor(baseUrl: string, apiKey?: string) {
+    this.client = new OpenAI({ baseURL: baseUrl, apiKey: apiKey ?? "..." });
   }
 
   async models(): Promise<string[]> {
@@ -147,3 +149,5 @@ export default class OpenAIProvider implements AIProvider {
     return res.output_text;
   }
 }
+
+providerTypes.set("openai-responses", OpenAIProvider);

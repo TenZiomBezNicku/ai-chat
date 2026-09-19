@@ -2,11 +2,13 @@ import { Context, Hono } from "hono";
 import { streamText } from "hono/streaming";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { getConnInfo, serveStatic } from "hono/deno";
-import { chat, ChatMessage, models, registerProvider } from "./AI.ts";
-import OllamaProvider from "./aiProviders/ollama.ts";
-import { Ollama } from "ollama";
-import OpenAIProvider from "./aiProviders/openai.ts";
-import { OpenAI } from "openai/client.mjs";
+import {
+  chat,
+  ChatMessage,
+  models,
+  providerTypes,
+  registerProvider,
+} from "./AI.ts";
 import { tavily } from "@tavily/core";
 import { registerTool } from "./agents.ts";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -14,6 +16,7 @@ import { db } from "./db/client.ts";
 import {
   attachments as attachs,
   chats,
+  llmProviders,
   messageAttachments,
   messages,
   sessions,
@@ -26,6 +29,9 @@ import { hash, verify } from "bcrypt";
 import { decodeHex, encodeHex } from "@std/encoding/hex";
 import { rateLimiter } from "hono-rate-limiter";
 
+import "./aiProviders/openai.ts";
+import "./aiProviders/ollama.ts";
+
 const PRODUCTION_ENV = Deno.env.get("PRODUCTION") === "true" ||
   Deno.env.get("PRODUCTION") === "1";
 
@@ -37,18 +43,22 @@ async function deleteExpiredSessions() {
 
 deleteExpiredSessions();
 
-registerProvider("ollama", new OllamaProvider(new Ollama()));
+const providers = await db.select().from(llmProviders);
 
-registerProvider(
-  "ollama_cloud",
-  new OllamaProvider(
-    new Ollama({
-      host: "https://ollama.com/",
-    }),
-  ),
-);
+for (const provider of providers) {
+  const p = providerTypes.get(provider.providerId);
 
-registerProvider("openai", new OpenAIProvider(new OpenAI()));
+  if (!p) {
+    console.warn(`Unknown provider "${provider.providerId}". Ignoring...`);
+
+    continue;
+  }
+
+  registerProvider(
+    provider.id,
+    new p(provider.baseUrl, provider.apiKey ?? undefined),
+  );
+}
 
 const tavilyClient = tavily({
   apiKey: Deno.env.get("TAVILY_API_KEY"),
@@ -601,6 +611,86 @@ app.get("/api/v1/me", async (c) => {
   return c.json(res[0]);
 });
 
+app.get("/api/v1/admin/providers", async (c) => {
+  const userId = c.get("userId");
+
+  const user = await db.select().from(users).where(eq(users.id, userId));
+
+  if (user[0].role == "admin") {
+    const providers = await db.select({
+      id: llmProviders.id,
+      providerId: llmProviders.providerId,
+      baseUrl: llmProviders.baseUrl,
+    }).from(llmProviders);
+
+    return c.json(providers);
+  } else {
+    return c.json({
+      error: "Forbidden",
+      message: "The user is not an administrator",
+    }, 403);
+  }
+});
+
+app.patch("/api/v1/admin/provider/:id", async (c) => {
+  const userId = c.get("userId");
+
+  const user = await db.select().from(users).where(eq(users.id, userId));
+
+  if (user[0].role == "admin") {
+    const id = c.req.param("id");
+
+    const { baseUrl, apiKey } = await c.req.json() as {
+      baseUrl?: string;
+      apiKey?: string;
+    };
+
+    await db.update(llmProviders).set({ baseUrl, apiKey }).where(
+      eq(llmProviders.id, id),
+    );
+
+    return c.json({});
+  } else {
+    return c.json({
+      error: "Forbidden",
+      message: "The user is not an administrator",
+    }, 403);
+  }
+});
+
+app.post("/api/v1/admin/provider", async (c) => {
+  const userId = c.get("userId");
+
+  const user = await db.select().from(users).where(eq(users.id, userId));
+
+  if (user[0].role == "admin") {
+    const { baseUrl, apiKey, id, providerId } = await c.req.json() as {
+      baseUrl: string;
+      apiKey: string;
+      id: string;
+      providerId: string;
+    };
+
+    const p = providerTypes.get(providerId);
+
+    if (!p) return c.text(`Unknown provider "${providerId}". Skipping...`, 400);
+
+    registerProvider(
+      id,
+      new p(baseUrl, apiKey ?? undefined),
+    );
+
+    await db.insert(llmProviders).values({ baseUrl, apiKey, id, providerId });
+
+    return c.json({});
+  } else {
+    return c.json({
+      error: "Forbidden",
+      message: "The user is not an administrator",
+    }, 403);
+  }
+});
+
 app.delete("/api/v1/logout", async (c) => {
   const sessionId = c.get("sessionId");
 
@@ -721,7 +811,7 @@ app.use(
 
 app.on(
   "GET",
-  ["/", "/c/:id", "/files"],
+  ["/", "/c/:id", "/files", "/admin"],
   serveStatic({
     path: "./dist/index.html",
   }),

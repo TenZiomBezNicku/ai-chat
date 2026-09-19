@@ -30,18 +30,6 @@ export const chats = sqliteTable("chats", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
 
-export const modelsSettings = sqliteTable("models_settings", {
-  id: text("id").primaryKey(),
-  modelName: text("model_name").notNull(),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
-});
-
-export const config = sqliteTable("config", {
-  key: text("key").primaryKey(),
-  value: text("value").notNull(),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
-});
-
 export const messages = sqliteTable("messages", {
   id: text("id").primaryKey(),
 
@@ -97,3 +85,22 @@ export const messageAttachments = sqliteTable(
     }),
   ],
 );
+
+export const modelsSettings = sqliteTable("models_settings", {
+  id: text("id").primaryKey(),
+  modelName: text("model_name").notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
+export const config = sqliteTable("config", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
+export const llmProviders = sqliteTable("llm_providers", {
+  id: text("id").primaryKey(),
+  apiKey: text("api_key"),
+  providerId: text("provider_id").notNull(),
+  baseUrl: text("base_url").notNull(),
+});
