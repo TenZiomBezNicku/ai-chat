@@ -1,7 +1,7 @@
-import { Hono } from "hono";
+import { Context, Hono } from "hono";
 import { streamText } from "hono/streaming";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
-import { serveStatic } from "hono/deno";
+import { getConnInfo, serveStatic } from "hono/deno";
 import { chat, ChatMessage, models, registerProvider } from "./AI.ts";
 import OllamaProvider from "./aiProviders/ollama.ts";
 import { Ollama } from "ollama";
@@ -24,6 +24,7 @@ import mime from "mime-types";
 import { startAgent } from "./agents.ts";
 import { hash, verify } from "bcrypt";
 import { decodeHex, encodeHex } from "@std/encoding/hex";
+import { rateLimiter } from "hono-rate-limiter";
 
 const PRODUCTION_ENV = Deno.env.get("PRODUCTION") === "true" ||
   Deno.env.get("PRODUCTION") === "1";
@@ -116,7 +117,9 @@ function parseDataUrl(dataUrl: string): {
   };
 }
 
-const app = new Hono<{ Variables: { userId: string; sessionId: string } }>();
+type AppEnv = { Variables: { userId: string; sessionId: string } };
+
+const app = new Hono<AppEnv>();
 
 app.use("/api/v1/*", async (c, next) => {
   const token = getCookie(c, "token");
@@ -158,6 +161,35 @@ app.use("/api/v1/*", async (c, next) => {
 
   await next();
 });
+
+export function getIp(c: Context<AppEnv>): string | undefined {
+  const proxy = Deno.env.get("PROXY") ?? "none";
+
+  switch (proxy) {
+    case "cloudflare":
+      return c.req.header("CF-Connecting-IP");
+
+    case "other":
+      return c.req.header("X-Forwarded-For")
+        ?.split(",")[0]
+        ?.trim();
+
+    case "none":
+      return getConnInfo(c).remote.address;
+
+    default:
+      throw new Error(`Invalid PROXY value: "${proxy}"`);
+  }
+}
+
+app.use(
+  "/api/*",
+  rateLimiter<AppEnv>({
+    limit: 25,
+    windowMs: 30000,
+    keyGenerator: (c) => getIp(c) ?? "",
+  }),
+);
 
 app.post("/api/v1/chat", async (c) => {
   const reqJson = (await c.req.json()) as {
