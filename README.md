@@ -18,7 +18,7 @@ Chat with LLMs in your browser using Ollama or any OpenAI-compatible API!
 ```bash
 mv backend/.env.example backend/.env
 ```
-2. Fill in the `backend/.env` file - Open this file in your favorite text editor and fill in theA PI keys. If you want to disable any backend, for now you have to comment (or remove) it from the code. [How to disable a backend](#how-to-disable-a-backend)
+2. Fill in the `backend/.env` file - Open this file in your favorite text editor and fill in the API keys. If you want to disable any backend, for now you have to comment (or remove) it from the code. [How to disable a backend](#how-to-disable-a-backend)
 3. Install frontend dependencies (in `frontend` directory):
 
 ```bash
