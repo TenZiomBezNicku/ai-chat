@@ -63,6 +63,8 @@ export const attachments = sqliteTable(
 
     userId: text("user_id").notNull(),
 
+    name: text("name").notNull(),
+
     hash: text("hash").notNull(),
 
     path: text("path").notNull(),

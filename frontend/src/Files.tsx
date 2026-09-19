@@ -7,6 +7,7 @@ export default function Files() {
       id: string;
       createdAt: Date;
       size: number;
+      name: string;
     }[]
   >([]);
 
@@ -17,7 +18,7 @@ export default function Files() {
 
       setFiles(json);
     })();
-  });
+  }, []);
 
   return (
     <div className="min-h-screen">
@@ -32,12 +33,24 @@ export default function Files() {
                   style={{
                     borderRadius: "8px",
                     objectFit: "cover",
-                    width: "192px"
+                    aspectRatio: "1 / 1",
+                    width: "128px",
                   }}
                 />
               );
             } else {
-              return <div>{v.id}</div>;
+              return (
+                <div
+                  style={{
+                    width: "256px",
+                    height: "128px",
+                    borderWidth: "1px",
+                    borderRadius: "8px",
+                  }}
+                >
+                  {v.name}
+                </div>
+              );
             }
           })}
         </div>

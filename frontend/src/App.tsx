@@ -78,8 +78,6 @@ function chatIdFromPath(pathname: string) {
 }
 
 function pathIsFiles(pathname: string) {
-  return false; // This is temporary
-
   if (pathname === "/files") {
     return true;
   }

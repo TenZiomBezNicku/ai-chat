@@ -300,6 +300,7 @@ app.post("/api/v1/chat", async (c) => {
         path: `./data/attachments/${attachmentId}.${ext}`,
         size: fileBytes.byteLength,
         userId: c.get("userId"),
+        name: randomUUID(),
       });
     }
 
@@ -560,6 +561,7 @@ app.get("/api/v1/files", async (c) => {
           createdAt: v.createdAt,
           mimeType: v.mimeType,
           size: v.size,
+          name: v.name,
         };
       },
     ),
@@ -577,6 +579,7 @@ app.get("/api/v1/files/:id", async (c) => {
           createdAt: attachs.createdAt,
           mimeType: attachs.mimeType,
           size: attachs.size,
+          name: attachs.name,
         })
         .from(attachs)
         .where(
