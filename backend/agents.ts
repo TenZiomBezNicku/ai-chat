@@ -97,3 +97,7 @@ export async function* startAgent(
 
   yield { type: "error", error: "Agent reached the maximum number of turns" };
 }
+
+export function isToolRegistered(tool: string): boolean {
+  return functions.has(tool);
+}

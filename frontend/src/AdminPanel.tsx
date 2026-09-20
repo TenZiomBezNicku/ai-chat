@@ -14,7 +14,8 @@ export default function AdminPanel() {
   >([]);
 
   const [baseUrl, setBaseUrl] = useState("");
-  const [apiKey, setApiKey] = useState("");
+  const [llmApiKey, setLLMApiKey] = useState("");
+  const [webApiKey, setWebApiKey] = useState("");
   const [namespace, setNamespace] = useState("");
   const [provider, setProvider] = useState("ollama");
   const [addingProvider, setAddingProvider] = useState(false);
@@ -91,8 +92,8 @@ export default function AdminPanel() {
                       fullWidth={true}
                       label="API Key (optional)"
                       type="password"
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
+                      value={llmApiKey}
+                      onChange={(e) => setLLMApiKey(e.target.value)}
                     />
                   </ThemeProvider>
 
@@ -117,7 +118,7 @@ export default function AdminPanel() {
                           method: "POST",
                           body: JSON.stringify({
                             baseUrl,
-                            apiKey: apiKey == "" ? null : apiKey,
+                            apiKey: llmApiKey == "" ? null : llmApiKey,
                             id: namespace,
                             providerId: provider,
                           }),
@@ -149,6 +150,37 @@ export default function AdminPanel() {
                   </div>
                 </div>
               ))}
+            </div>
+
+            <h3 className="text-xl">Web Search</h3>
+            <div className="p-4">
+              <ThemeProvider
+                theme={createTheme({
+                  palette: {
+                    mode: "dark",
+                  },
+                })}
+              >
+                <TextField
+                  type="password"
+                  label="Tavily API Key"
+                  value={webApiKey}
+                  onChange={(e) => setWebApiKey(e.target.value)}
+                />
+                <br />
+
+                <button
+                  className="rounded-lg bg-neutral-600 px-4 py-2 text-white hover:bg-neutral-500 mt-2"
+                  onClick={async () => {
+                    await fetch("/api/v1/admin/websearch", {
+                      method: "PUT",
+                      body: JSON.stringify({ apiKey: webApiKey }),
+                    });
+                  }}
+                >
+                  Set
+                </button>
+              </ThemeProvider>
             </div>
           </div>
         </div>

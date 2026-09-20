@@ -9,13 +9,14 @@ import {
   providerTypes,
   registerProvider,
 } from "./AI.ts";
-import { tavily } from "@tavily/core";
-import { registerTool } from "./agents.ts";
+import { tavily, TavilyClient } from "@tavily/core";
+import { isToolRegistered, registerTool } from "./agents.ts";
 import { randomBytes, randomUUID } from "node:crypto";
 import { db } from "./db/client.ts";
 import {
   attachments as attachs,
   chats,
+  config,
   llmProviders,
   messageAttachments,
   messages,
@@ -60,9 +61,49 @@ for (const provider of providers) {
   );
 }
 
-const tavilyClient = tavily({
-  apiKey: Deno.env.get("TAVILY_API_KEY"),
-});
+async function loadConfig() {
+  const configurationRows = await db.select().from(config);
+
+  const result: Record<string, string> = Object.fromEntries(
+    configurationRows.map(({ key, value }) => [key, value]),
+  );
+
+  return result;
+}
+
+const configuration = await loadConfig();
+
+let tavilyClient: TavilyClient;
+
+function registerWebSearch() {
+  registerTool(
+    async (args) => {
+      const { query } = JSON.parse(args);
+
+      const res = await tavilyClient.search(query, { searchDepth: "advanced" });
+
+      return JSON.stringify(res);
+    },
+    {
+      name: "web_search",
+      description: "Searches for information on the Internet",
+      parameters: {
+        type: "object",
+        properties: { query: { type: "string", description: "Search query" } },
+        required: ["query"],
+        additionalProperties: false,
+      },
+    },
+  );
+}
+
+if (configuration.TAVILY_API_KEY) {
+  tavilyClient = tavily({
+    apiKey: configuration.TAVILY_API_KEY,
+  });
+
+  registerWebSearch();
+}
 
 registerTool(
   (args) => {
@@ -86,26 +127,6 @@ registerTool(
       type: "object",
       properties: { zone: { type: "string", description: "Timezone" } },
       required: ["zone"],
-      additionalProperties: false,
-    },
-  },
-);
-
-registerTool(
-  async (args) => {
-    const { query } = JSON.parse(args);
-
-    const res = await tavilyClient.search(query, { searchDepth: "advanced" });
-
-    return JSON.stringify(res);
-  },
-  {
-    name: "web_search",
-    description: "Searches for information on the Internet",
-    parameters: {
-      type: "object",
-      properties: { query: { type: "string", description: "Search query" } },
-      required: ["query"],
       additionalProperties: false,
     },
   },
@@ -649,7 +670,7 @@ app.patch("/api/v1/admin/provider/:id", async (c) => {
       eq(llmProviders.id, id),
     );
 
-    return c.json({});
+    return c.json({ message: "Success!" });
   } else {
     return c.json({
       error: "Forbidden",
@@ -682,7 +703,36 @@ app.post("/api/v1/admin/provider", async (c) => {
 
     await db.insert(llmProviders).values({ baseUrl, apiKey, id, providerId });
 
-    return c.json({});
+    return c.json({ message: "Success!" });
+  } else {
+    return c.json({
+      error: "Forbidden",
+      message: "The user is not an administrator",
+    }, 403);
+  }
+});
+
+app.put("/api/v1/admin/websearch", async (c) => {
+  const userId = c.get("userId");
+
+  const user = await db.select().from(users).where(eq(users.id, userId));
+
+  if (user[0].role == "admin") {
+    const { apiKey } = await c.req.json();
+
+    await db.insert(config).values({
+      key: "TAVILY_API_KEY",
+      updatedAt: new Date(),
+      value: JSON.stringify({ apiKey }),
+    }).onConflictDoUpdate({ target: config.key, set: { value: apiKey } });
+
+    tavilyClient = tavily({ apiKey });
+
+    if (!isToolRegistered("web_search")) {
+      registerWebSearch();
+    }
+
+    return c.json({ message: "Success!" });
   } else {
     return c.json({
       error: "Forbidden",
