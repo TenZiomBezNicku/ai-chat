@@ -99,7 +99,7 @@ function registerWebSearch() {
 
 if (configuration.TAVILY_API_KEY) {
   tavilyClient = tavily({
-    apiKey: configuration.TAVILY_API_KEY,
+    apiKey: JSON.parse(configuration.TAVILY_API_KEY).apiKey,
   });
 
   registerWebSearch();
@@ -724,7 +724,10 @@ app.put("/api/v1/admin/websearch", async (c) => {
       key: "TAVILY_API_KEY",
       updatedAt: new Date(),
       value: JSON.stringify({ apiKey }),
-    }).onConflictDoUpdate({ target: config.key, set: { value: apiKey } });
+    }).onConflictDoUpdate({
+      target: config.key,
+      set: { value: JSON.stringify({ apiKey }) },
+    });
 
     tavilyClient = tavily({ apiKey });
 
