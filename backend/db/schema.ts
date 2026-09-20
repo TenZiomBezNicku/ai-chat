@@ -1,4 +1,5 @@
 import {
+  blob,
   integer,
   primaryKey,
   sqliteTable,
@@ -92,6 +93,14 @@ export const modelsSettings = sqliteTable("models_settings", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
 
+export const encryptedKV = sqliteTable("encrypted_kv", {
+  key: text("key").primaryKey(),
+  value: blob("value").notNull(),
+  iv: blob("iv").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
 export const config = sqliteTable("config", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
@@ -100,7 +109,8 @@ export const config = sqliteTable("config", {
 
 export const llmProviders = sqliteTable("llm_providers", {
   id: text("id").primaryKey(),
-  apiKey: text("api_key"),
+  apiKey: blob("api_key"),
+  iv: blob("iv"),
   providerId: text("provider_id").notNull(),
   baseUrl: text("base_url").notNull(),
 });

@@ -17,6 +17,7 @@ import {
   attachments as attachs,
   chats,
   config,
+  encryptedKV,
   llmProviders,
   messageAttachments,
   messages,
@@ -30,6 +31,8 @@ import { hash, verify } from "bcrypt";
 import { decodeHex, encodeHex } from "@std/encoding/hex";
 import { rateLimiter } from "hono-rate-limiter";
 
+import "./genenv.ts";
+
 import "./aiProviders/openai.ts";
 import "./aiProviders/ollama.ts";
 
@@ -37,6 +40,35 @@ const PRODUCTION_ENV =
   Deno.env.get("PRODUCTION") === "true" || Deno.env.get("PRODUCTION") === "1";
 
 Deno.mkdirSync("./data/attachments", { recursive: true });
+
+async function importEnvKey(envVar: string) {
+  const keyHex = Deno.env.get(envVar);
+
+  if (!keyHex) {
+    throw new Error(`${envVar} is not set`);
+  }
+
+  if (!/^[0-9a-fA-F]{64}$/.test(keyHex)) {
+    throw new Error(`${envVar} must be a 32-byte hex string`);
+  }
+
+  const keyBytes = Uint8Array.from(
+    keyHex.match(/.{2}/g)!.map((byte) => parseInt(byte, 16)),
+  );
+
+  return await crypto.subtle.importKey(
+    "raw",
+    keyBytes,
+    {
+      name: "AES-GCM",
+    },
+    false,
+    ["encrypt", "decrypt"],
+  );
+}
+
+const kvEncryptionKey = await importEnvKey("KV_ENCRYPTION_KEY");
+const apiKeysEncryptionKey = await importEnvKey("API_KEYS_ENCRYPTION_KEY");
 
 async function deleteExpiredSessions() {
   await db.delete(sessions).where(lte(sessions.expiresAt, new Date()));
@@ -50,15 +82,27 @@ for (const provider of providers) {
   const p = providerTypes.get(provider.providerId);
 
   if (!p) {
-    console.warn(`Unknown provider "${provider.providerId}". Ignoring...`);
+    console.warn(`Unknown provider "${provider.providerId}". Skipping...`);
 
     continue;
   }
 
-  registerProvider(
-    provider.id,
-    new p(provider.baseUrl, provider.apiKey ?? undefined),
+  if ((provider.iv == null) !== (provider.apiKey == null)) {
+    console.warn(`"${provider.id}" provider entry is invalid. Skipping...`);
+
+    continue;
+  }
+
+  const decrypted = await crypto.subtle.decrypt(
+    {
+      name: "AES-GCM",
+      iv: provider.iv as Uint8Array<ArrayBuffer>,
+    },
+    apiKeysEncryptionKey,
+    provider.apiKey as Uint8Array<ArrayBuffer>,
   );
+
+  registerProvider(provider.id, new p(provider.baseUrl));
 }
 
 async function loadConfig() {
@@ -672,9 +716,21 @@ app.patch("/api/v1/admin/provider/:id", async (c) => {
       apiKey?: string;
     };
 
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+
+    const encrypted = await crypto.subtle.encrypt(
+      {
+        name: "AES-GCM",
+        iv,
+        additionalData: new TextEncoder().encode(id),
+      },
+      apiKeysEncryptionKey,
+      new TextEncoder().encode(apiKey),
+    );
+
     await db
       .update(llmProviders)
-      .set({ baseUrl, apiKey })
+      .set({ baseUrl, apiKey: encrypted })
       .where(eq(llmProviders.id, id));
 
     return c.json({ message: "Success!" });
@@ -704,11 +760,25 @@ app.post("/api/v1/admin/provider", async (c) => {
 
     const p = providerTypes.get(providerId);
 
-    if (!p) return c.text(`Unknown provider "${providerId}". Skipping...`, 400);
+    if (!p) return c.text(`Unknown provider "${providerId}"!`, 400);
 
     registerProvider(id, new p(baseUrl, apiKey ?? undefined));
 
-    await db.insert(llmProviders).values({ baseUrl, apiKey, id, providerId });
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+
+    const encrypted = await crypto.subtle.encrypt(
+      {
+        name: "AES-GCM",
+        iv,
+        additionalData: new TextEncoder().encode(id),
+      },
+      apiKeysEncryptionKey,
+      new TextEncoder().encode(apiKey),
+    );
+
+    await db
+      .insert(llmProviders)
+      .values({ iv, baseUrl, apiKey: encrypted, id, providerId });
 
     return c.json({ message: "Success!" });
   } else {
@@ -730,16 +800,32 @@ app.put("/api/v1/admin/websearch", async (c) => {
   if (user[0].role == "admin") {
     const { apiKey } = await c.req.json();
 
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+
+    const key = "config.TAVILY_API_KEY";
+
+    const encrypted = await crypto.subtle.encrypt(
+      {
+        name: "AES-GCM",
+        iv,
+        additionalData: new TextEncoder().encode(key),
+      },
+      kvEncryptionKey,
+      new TextEncoder().encode(apiKey),
+    );
+
     await db
-      .insert(config)
+      .insert(encryptedKV)
       .values({
-        key: "TAVILY_API_KEY",
+        key,
         updatedAt: new Date(),
-        value: JSON.stringify({ apiKey }),
+        createdAt: new Date(),
+        value: encrypted,
+        iv,
       })
       .onConflictDoUpdate({
-        target: config.key,
-        set: { value: JSON.stringify({ apiKey }) },
+        target: encryptedKV.key,
+        set: { value: encrypted, updatedAt: new Date() },
       });
 
     tavilyClient = tavily({ apiKey });
