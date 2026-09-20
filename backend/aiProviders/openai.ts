@@ -12,21 +12,25 @@ function toOpenAIInput(
 ): OpenAI.Responses.ResponseInput {
   const input = messages.flatMap((message): unknown[] => {
     if (message.role === "tool") {
-      return [{
-        type: "function_call_output" as const,
-        call_id: message.toolCallId,
-        output: message.content,
-      }];
+      return [
+        {
+          type: "function_call_output" as const,
+          call_id: message.toolCallId,
+          output: message.content,
+        },
+      ];
     }
 
     if (message.role === "assistant" && message.toolCalls?.length) {
       return [
         ...(message.content
-          ? [{
-            type: "message" as const,
-            role: "assistant" as const,
-            content: message.content,
-          }]
+          ? [
+              {
+                type: "message" as const,
+                role: "assistant" as const,
+                content: message.content,
+              },
+            ]
           : []),
         ...message.toolCalls.map((toolCall) => ({
           type: "function_call" as const,
@@ -37,10 +41,12 @@ function toOpenAIInput(
       ];
     }
 
-    return [{
-      role: message.role,
-      content: message.content,
-    }];
+    return [
+      {
+        role: message.role,
+        content: message.content,
+      },
+    ];
   });
 
   return input as OpenAI.Responses.ResponseInput;
@@ -85,10 +91,13 @@ export default class OpenAIProvider implements AIProvider {
     tools?: ToolDefinition[],
   ): AsyncIterable<ChatEvent> {
     const input: OpenAI.Responses.ResponseInput = system
-      ? [{
-        content: system,
-        role: "system",
-      }, ...toOpenAIInput(messages)]
+      ? [
+          {
+            content: system,
+            role: "system",
+          },
+          ...toOpenAIInput(messages),
+        ]
       : toOpenAIInput(messages);
 
     let processedTools: OpenAI.Responses.Tool[] | undefined = undefined;
@@ -134,10 +143,13 @@ export default class OpenAIProvider implements AIProvider {
     system?: string,
   ): Promise<string> {
     const input: OpenAI.Responses.ResponseInput = system
-      ? [{
-        content: system,
-        role: "system",
-      }, ...toOpenAIInput(messages)]
+      ? [
+          {
+            content: system,
+            role: "system",
+          },
+          ...toOpenAIInput(messages),
+        ]
       : toOpenAIInput(messages);
 
     const res = await this.client.responses.create({

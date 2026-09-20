@@ -7,21 +7,21 @@ export interface ChatRequest {
 
 export type ChatMessage =
   | {
-    role: "user";
-    content: string;
-    images?: string[];
-  }
+      role: "user";
+      content: string;
+      images?: string[];
+    }
   | {
-    role: "assistant";
-    content: string;
-    images?: string[];
-    toolCalls?: ToolCall[];
-  }
+      role: "assistant";
+      content: string;
+      images?: string[];
+      toolCalls?: ToolCall[];
+    }
   | {
-    role: "tool";
-    content: string;
-    toolCallId: string;
-  };
+      role: "tool";
+      content: string;
+      toolCallId: string;
+    };
 
 export interface ToolCall {
   id: string;
@@ -31,26 +31,26 @@ export interface ToolCall {
 
 export type ChatEvent =
   | {
-    type: "text";
-    text: string;
-  }
+      type: "text";
+      text: string;
+    }
   | {
-    type: "reasoning";
-    text: string;
-  }
+      type: "reasoning";
+      text: string;
+    }
   | {
-    type: "tool_call";
-    id: string;
-    name: string;
-    arguments: string;
-  }
+      type: "tool_call";
+      id: string;
+      name: string;
+      arguments: string;
+    }
   | {
-    type: "done";
-  }
+      type: "done";
+    }
   | {
-    type: "error";
-    error: string;
-  };
+      type: "error";
+      error: string;
+    };
 
 export interface ToolDefinition {
   name: string;
@@ -219,11 +219,7 @@ export function chat(request: ChatRequest): Promise<string> {
   const provider = providers.get(providerId);
 
   if (provider) {
-    return provider.chat(
-      model,
-      request.messages,
-      request.system,
-    );
+    return provider.chat(model, request.messages, request.system);
   }
 
   throw new Error("Provider not found!");

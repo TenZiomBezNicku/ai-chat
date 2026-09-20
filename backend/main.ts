@@ -33,8 +33,8 @@ import { rateLimiter } from "hono-rate-limiter";
 import "./aiProviders/openai.ts";
 import "./aiProviders/ollama.ts";
 
-const PRODUCTION_ENV = Deno.env.get("PRODUCTION") === "true" ||
-  Deno.env.get("PRODUCTION") === "1";
+const PRODUCTION_ENV =
+  Deno.env.get("PRODUCTION") === "true" || Deno.env.get("PRODUCTION") === "1";
 
 Deno.mkdirSync("./data/attachments", { recursive: true });
 
@@ -201,9 +201,7 @@ export function getIp(c: Context<AppEnv>): string | undefined {
       return c.req.header("CF-Connecting-IP");
 
     case "other":
-      return c.req.header("X-Forwarded-For")
-        ?.split(",")[0]
-        ?.trim();
+      return c.req.header("X-Forwarded-For")?.split(",")[0]?.trim();
 
     case "none":
       return getConnInfo(c).remote.address;
@@ -623,11 +621,14 @@ app.get("/api/v1/files/:id", async (c) => {
 app.get("/api/v1/me", async (c) => {
   const userId = c.get("userId");
 
-  const res = await db.select({
-    id: users.id,
-    role: users.role,
-    username: users.username,
-  }).from(users).where(eq(users.id, userId));
+  const res = await db
+    .select({
+      id: users.id,
+      role: users.role,
+      username: users.username,
+    })
+    .from(users)
+    .where(eq(users.id, userId));
 
   return c.json(res[0]);
 });
@@ -638,18 +639,23 @@ app.get("/api/v1/admin/providers", async (c) => {
   const user = await db.select().from(users).where(eq(users.id, userId));
 
   if (user[0].role == "admin") {
-    const providers = await db.select({
-      id: llmProviders.id,
-      providerId: llmProviders.providerId,
-      baseUrl: llmProviders.baseUrl,
-    }).from(llmProviders);
+    const providers = await db
+      .select({
+        id: llmProviders.id,
+        providerId: llmProviders.providerId,
+        baseUrl: llmProviders.baseUrl,
+      })
+      .from(llmProviders);
 
     return c.json(providers);
   } else {
-    return c.json({
-      error: "Forbidden",
-      message: "The user is not an administrator",
-    }, 403);
+    return c.json(
+      {
+        error: "Forbidden",
+        message: "The user is not an administrator",
+      },
+      403,
+    );
   }
 });
 
@@ -661,21 +667,25 @@ app.patch("/api/v1/admin/provider/:id", async (c) => {
   if (user[0].role == "admin") {
     const id = c.req.param("id");
 
-    const { baseUrl, apiKey } = await c.req.json() as {
+    const { baseUrl, apiKey } = (await c.req.json()) as {
       baseUrl?: string;
       apiKey?: string;
     };
 
-    await db.update(llmProviders).set({ baseUrl, apiKey }).where(
-      eq(llmProviders.id, id),
-    );
+    await db
+      .update(llmProviders)
+      .set({ baseUrl, apiKey })
+      .where(eq(llmProviders.id, id));
 
     return c.json({ message: "Success!" });
   } else {
-    return c.json({
-      error: "Forbidden",
-      message: "The user is not an administrator",
-    }, 403);
+    return c.json(
+      {
+        error: "Forbidden",
+        message: "The user is not an administrator",
+      },
+      403,
+    );
   }
 });
 
@@ -685,7 +695,7 @@ app.post("/api/v1/admin/provider", async (c) => {
   const user = await db.select().from(users).where(eq(users.id, userId));
 
   if (user[0].role == "admin") {
-    const { baseUrl, apiKey, id, providerId } = await c.req.json() as {
+    const { baseUrl, apiKey, id, providerId } = (await c.req.json()) as {
       baseUrl: string;
       apiKey: string;
       id: string;
@@ -696,19 +706,19 @@ app.post("/api/v1/admin/provider", async (c) => {
 
     if (!p) return c.text(`Unknown provider "${providerId}". Skipping...`, 400);
 
-    registerProvider(
-      id,
-      new p(baseUrl, apiKey ?? undefined),
-    );
+    registerProvider(id, new p(baseUrl, apiKey ?? undefined));
 
     await db.insert(llmProviders).values({ baseUrl, apiKey, id, providerId });
 
     return c.json({ message: "Success!" });
   } else {
-    return c.json({
-      error: "Forbidden",
-      message: "The user is not an administrator",
-    }, 403);
+    return c.json(
+      {
+        error: "Forbidden",
+        message: "The user is not an administrator",
+      },
+      403,
+    );
   }
 });
 
@@ -720,14 +730,17 @@ app.put("/api/v1/admin/websearch", async (c) => {
   if (user[0].role == "admin") {
     const { apiKey } = await c.req.json();
 
-    await db.insert(config).values({
-      key: "TAVILY_API_KEY",
-      updatedAt: new Date(),
-      value: JSON.stringify({ apiKey }),
-    }).onConflictDoUpdate({
-      target: config.key,
-      set: { value: JSON.stringify({ apiKey }) },
-    });
+    await db
+      .insert(config)
+      .values({
+        key: "TAVILY_API_KEY",
+        updatedAt: new Date(),
+        value: JSON.stringify({ apiKey }),
+      })
+      .onConflictDoUpdate({
+        target: config.key,
+        set: { value: JSON.stringify({ apiKey }) },
+      });
 
     tavilyClient = tavily({ apiKey });
 
@@ -737,10 +750,13 @@ app.put("/api/v1/admin/websearch", async (c) => {
 
     return c.json({ message: "Success!" });
   } else {
-    return c.json({
-      error: "Forbidden",
-      message: "The user is not an administrator",
-    }, 403);
+    return c.json(
+      {
+        error: "Forbidden",
+        message: "The user is not an administrator",
+      },
+      403,
+    );
   }
 });
 
@@ -759,7 +775,7 @@ app.post("/api/auth/register", async (c) => {
 
   if (
     (await db.select().from(users).where(eq(users.username, username))).length >
-      0
+    0
   ) {
     return c.status(409);
   }

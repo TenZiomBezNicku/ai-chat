@@ -66,7 +66,7 @@ export default class OllamaProvider implements AIProvider {
   public constructor(baseUrl: string, apiKey?: string) {
     this.client = new Ollama({
       host: baseUrl,
-      headers: apiKey ? { "Authorization": `Bearer ${apiKey}` } : undefined,
+      headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined,
     });
   }
 
