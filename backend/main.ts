@@ -30,6 +30,7 @@ import { startAgent } from "./agents.ts";
 import { hash, verify } from "bcrypt";
 import { decodeHex, encodeHex } from "@std/encoding/hex";
 import { rateLimiter } from "hono-rate-limiter";
+import { Buffer } from "node:buffer";
 
 import "./genenv.ts";
 
@@ -730,7 +731,7 @@ app.patch("/api/v1/admin/provider/:id", async (c) => {
 
     await db
       .update(llmProviders)
-      .set({ baseUrl, apiKey: encrypted })
+      .set({ baseUrl, apiKey: Buffer.from(encrypted), iv: Buffer.from(iv) })
       .where(eq(llmProviders.id, id));
 
     return c.json({ message: "Success!" });
@@ -776,9 +777,13 @@ app.post("/api/v1/admin/provider", async (c) => {
       new TextEncoder().encode(apiKey),
     );
 
-    await db
-      .insert(llmProviders)
-      .values({ iv, baseUrl, apiKey: encrypted, id, providerId });
+    await db.insert(llmProviders).values({
+      baseUrl,
+      apiKey: Buffer.from(encrypted),
+      iv: Buffer.from(iv),
+      id,
+      providerId,
+    });
 
     return c.json({ message: "Success!" });
   } else {
@@ -820,12 +825,12 @@ app.put("/api/v1/admin/websearch", async (c) => {
         key,
         updatedAt: new Date(),
         createdAt: new Date(),
-        value: encrypted,
-        iv,
+        value: Buffer.from(encrypted),
+        iv: Buffer.from(iv),
       })
       .onConflictDoUpdate({
         target: encryptedKV.key,
-        set: { value: encrypted, updatedAt: new Date() },
+        set: { value: encrypted, iv: Buffer.from(iv), updatedAt: new Date() },
       });
 
     tavilyClient = tavily({ apiKey });
