@@ -94,14 +94,23 @@ for (const provider of providers) {
     continue;
   }
 
-  const decrypted = await crypto.subtle.decrypt(
-    {
-      name: "AES-GCM",
-      iv: provider.iv as Uint8Array<ArrayBuffer>,
-    },
-    apiKeysEncryptionKey,
-    provider.apiKey as Uint8Array<ArrayBuffer>,
-  );
+  if (provider.iv != null && provider.apiKey != null) {
+    const decrypted = await crypto.subtle.decrypt(
+      {
+        name: "AES-GCM",
+        iv: provider.iv as Uint8Array<ArrayBuffer>,
+      },
+      apiKeysEncryptionKey,
+      provider.apiKey as Uint8Array<ArrayBuffer>,
+    );
+
+    registerProvider(
+      provider.id,
+      new p(provider.baseUrl, new TextDecoder().decode(decrypted)),
+    );
+
+    continue;
+  }
 
   registerProvider(provider.id, new p(provider.baseUrl));
 }
