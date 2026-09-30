@@ -21,10 +21,13 @@ import {
   llmProviders,
   messageAttachments,
   messages,
+  modelsSettings,
   sessions,
+  userModelUsageMonthly,
+  userModelUsageSession,
   users,
 } from "./db/schema.ts";
-import { and, eq, lte } from "drizzle-orm";
+import { and, eq, lte, sql } from "drizzle-orm";
 import mime from "mime-types";
 import { startAgent } from "./agents.ts";
 import { hash, verify } from "bcrypt";
@@ -274,6 +277,41 @@ app.use(
   }),
 );
 
+async function getMaxModelQuota(model: string) {
+  const modelSettings = await db
+    .select()
+    .from(modelsSettings)
+    .where(eq(modelsSettings.modelName, model));
+
+  if (modelSettings.length > 0) {
+    return {
+      monthly: modelSettings[0].maxMonthlyTokens,
+      session: modelSettings[0].maxSessionTokens,
+    };
+  }
+
+  const globalModelSettings = await db
+    .select()
+    .from(config)
+    .where(eq(config.key, "default_model_set"));
+
+  if (globalModelSettings.length > 0) {
+    const { maxMonthlyTokens, maxSessionTokens } = JSON.parse(
+      globalModelSettings[0].value,
+    );
+
+    return {
+      monthly: maxMonthlyTokens,
+      session: maxSessionTokens,
+    };
+  }
+
+  return {
+    monthly: 512 * 1024,
+    session: 64 * 1024,
+  };
+}
+
 app.post("/api/v1/chat", async (c) => {
   const reqJson = (await c.req.json()) as {
     chatId?: string;
@@ -295,6 +333,85 @@ app.post("/api/v1/chat", async (c) => {
       400,
     );
   }
+
+  let monthlyTokens = 0;
+
+  const monthlyUsage = await db
+    .select()
+    .from(userModelUsageMonthly)
+    .where(
+      and(
+        eq(userModelUsageMonthly.userId, c.get("userId")),
+        eq(userModelUsageMonthly.model, reqJson.model),
+      ),
+    );
+
+  if (monthlyUsage.length > 0) {
+    if (
+      monthlyUsage[0].windowStartedAt.getTime() >=
+      30 * 24 * 60 * 60 * 1000 + Date.now()
+    )
+      await db
+        .delete(userModelUsageMonthly)
+        .where(
+          and(
+            eq(userModelUsageMonthly.userId, c.get("userId")),
+            eq(userModelUsageMonthly.model, reqJson.model),
+          ),
+        );
+    else
+      monthlyTokens =
+        monthlyUsage[0].inputTokens + monthlyUsage[0].outputTokens;
+  }
+
+  let sessionTokens = 0;
+  const sessionUsage = await db
+    .select()
+    .from(userModelUsageSession)
+    .where(
+      and(
+        eq(userModelUsageSession.userId, c.get("userId")),
+        eq(userModelUsageSession.model, reqJson.model),
+      ),
+    );
+
+  if (sessionUsage.length > 0) {
+    if (
+      sessionUsage[0].windowStartedAt.getTime() >=
+      5 * 60 * 60 * 1000 + Date.now()
+    )
+      await db
+        .delete(userModelUsageSession)
+        .where(
+          and(
+            eq(userModelUsageSession.userId, c.get("userId")),
+            eq(userModelUsageSession.model, reqJson.model),
+          ),
+        );
+    else
+      sessionTokens =
+        sessionUsage[0].inputTokens + sessionUsage[0].outputTokens;
+  }
+
+  const maxQuota = await getMaxModelQuota(reqJson.model);
+
+  if (sessionTokens > maxQuota.session)
+    return c.json(
+      {
+        error: "usage_limit_exceeded",
+        message: "You have exceeded your usage limit.",
+      },
+      429,
+    );
+
+  if (monthlyTokens > maxQuota.monthly)
+    return c.json(
+      {
+        error: "usage_limit_exceeded",
+        message: "You have exceeded your usage limit.",
+      },
+      429,
+    );
 
   let chatId = reqJson.chatId;
 
@@ -477,7 +594,49 @@ app.post("/api/v1/chat", async (c) => {
           case "done":
             await send({
               kind: "done",
+              inputTokens: token.inputTokens,
+              outputTokens: token.outputTokens,
             });
+
+            await db
+              .insert(userModelUsageMonthly)
+              .values({
+                model: reqJson.model,
+                userId: c.get("userId"),
+                inputTokens: token.inputTokens,
+                outputTokens: token.outputTokens,
+                windowStartedAt: new Date(),
+              })
+              .onConflictDoUpdate({
+                target: [
+                  userModelUsageMonthly.userId,
+                  userModelUsageMonthly.model,
+                ],
+                set: {
+                  inputTokens: sql`${userModelUsageMonthly.inputTokens} + ${token.inputTokens}`,
+                  outputTokens: sql`${userModelUsageMonthly.outputTokens} + ${token.outputTokens}`,
+                },
+              });
+
+            await db
+              .insert(userModelUsageSession)
+              .values({
+                model: reqJson.model,
+                userId: c.get("userId"),
+                inputTokens: token.inputTokens,
+                outputTokens: token.outputTokens,
+                windowStartedAt: new Date(),
+              })
+              .onConflictDoUpdate({
+                target: [
+                  userModelUsageSession.userId,
+                  userModelUsageSession.model,
+                ],
+                set: {
+                  inputTokens: sql`${userModelUsageSession.inputTokens} + ${token.inputTokens}`,
+                  outputTokens: sql`${userModelUsageSession.outputTokens} + ${token.outputTokens}`,
+                },
+              });
             break;
 
           case "reasoning":

@@ -117,7 +117,11 @@ export default class OpenAIProvider implements AIProvider {
       } else if (chunk.type === "response.reasoning_text.delta") {
         yield { type: "reasoning", text: chunk.delta };
       } else if (chunk.type === "response.completed") {
-        yield { type: "done" };
+        yield {
+          type: "done",
+          inputTokens: chunk.response.usage?.input_tokens ?? 0,
+          outputTokens: chunk.response.usage?.output_tokens ?? 0,
+        };
         return;
       } else if (chunk.type === "response.output_item.done") {
         if (chunk.item.type == "function_call") {

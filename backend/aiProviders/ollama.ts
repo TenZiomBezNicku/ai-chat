@@ -116,6 +116,16 @@ export default class OllamaProvider implements AIProvider {
         continue;
       }
 
+      if (chunk.done) {
+        yield {
+          type: "done",
+          inputTokens: chunk.prompt_eval_count,
+          outputTokens: chunk.eval_count,
+        };
+
+        return;
+      }
+
       yield { type: "text", text: chunk.message.content };
     }
   }

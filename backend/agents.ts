@@ -41,6 +41,9 @@ export async function* startAgent(
     let text = "";
     const toolCalls: ToolCall[] = [];
 
+    let inputTokens = 0;
+    let outputTokens = 0;
+
     for await (const chunk of res) {
       if (chunk.type === "text") {
         text += chunk.text;
@@ -53,6 +56,9 @@ export async function* startAgent(
       } else if (chunk.type === "error") {
         yield chunk;
         return;
+      } else if (chunk.type === "done") {
+        inputTokens += chunk.inputTokens;
+        outputTokens += chunk.outputTokens;
       }
     }
 
@@ -63,7 +69,7 @@ export async function* startAgent(
     });
 
     if (!toolCalls.length) {
-      yield { type: "done" };
+      yield { type: "done", inputTokens, outputTokens };
       return;
     }
 

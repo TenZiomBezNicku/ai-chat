@@ -90,6 +90,9 @@ export const messageAttachments = sqliteTable(
 export const modelsSettings = sqliteTable("models_settings", {
   id: text("id").primaryKey(),
   modelName: text("model_name").notNull(),
+  isPublic: integer("is_public"),
+  maxMonthlyTokens: integer("max_monthly_tokens"),
+  maxSessionTokens: integer("max_session_tokens"),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
 
@@ -114,3 +117,40 @@ export const llmProviders = sqliteTable("llm_providers", {
   providerId: text("provider_id").notNull(),
   baseUrl: text("base_url").notNull(),
 });
+
+export const userModelUsageMonthly = sqliteTable(
+  "user_model_usage_monthly",
+  {
+    userId: text("user_id").notNull(),
+    model: text("model").notNull(),
+    inputTokens: integer("input_tokens").notNull().default(0),
+    outputTokens: integer("output_tokens").notNull().default(0),
+    windowStartedAt: integer("window_started_at", {
+      mode: "timestamp",
+    }).notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.userId, table.model],
+    }),
+  ],
+);
+
+// 5-hour usage window
+export const userModelUsageSession = sqliteTable(
+  "user_model_usage_session",
+  {
+    userId: text("user_id").notNull(),
+    model: text("model").notNull(),
+    inputTokens: integer("input_tokens").notNull().default(0),
+    outputTokens: integer("output_tokens").notNull().default(0),
+    windowStartedAt: integer("window_started_at", {
+      mode: "timestamp",
+    }).notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.userId, table.model],
+    }),
+  ],
+);

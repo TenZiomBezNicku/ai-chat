@@ -46,6 +46,8 @@ export type ChatEvent =
     }
   | {
       type: "done";
+      inputTokens: number,
+      outputTokens: number,
     }
   | {
       type: "error";
