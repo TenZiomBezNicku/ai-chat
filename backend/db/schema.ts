@@ -90,9 +90,9 @@ export const messageAttachments = sqliteTable(
 export const modelsSettings = sqliteTable("models_settings", {
   id: text("id").primaryKey(),
   modelName: text("model_name").notNull(),
-  isPublic: integer("is_public"),
-  maxMonthlyTokens: integer("max_monthly_tokens"),
-  maxSessionTokens: integer("max_session_tokens"),
+  isPublic: integer("is_public").notNull(),
+  maxMonthlyTokens: integer("max_monthly_tokens").notNull(),
+  maxSessionTokens: integer("max_session_tokens").notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
 
