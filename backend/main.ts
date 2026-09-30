@@ -359,8 +359,8 @@ app.post("/api/v1/chat", async (c) => {
 
     if (monthlyUsage.length > 0) {
       if (
-        monthlyUsage[0].windowStartedAt.getTime() >=
-        30 * 24 * 60 * 60 * 1000 + Date.now()
+        Date.now() >=
+        30 * 24 * 60 * 60 * 1000 + monthlyUsage[0].windowStartedAt.getTime()
       )
         await db
           .delete(userModelUsageMonthly)
@@ -389,8 +389,8 @@ app.post("/api/v1/chat", async (c) => {
 
     if (sessionUsage.length > 0) {
       if (
-        sessionUsage[0].windowStartedAt.getTime() >=
-        5 * 60 * 60 * 1000 + Date.now()
+        Date.now() >=
+        5 * 60 * 60 * 1000 + sessionUsage[0].windowStartedAt.getTime()
       )
         await db
           .delete(userModelUsageSession)
@@ -407,7 +407,7 @@ app.post("/api/v1/chat", async (c) => {
 
     const maxQuota = await getMaxModelQuota(reqJson.model);
 
-    if (sessionTokens > maxQuota.session)
+    if (sessionTokens >= maxQuota.session)
       return c.json(
         {
           error: "usage_limit_exceeded",
@@ -416,7 +416,7 @@ app.post("/api/v1/chat", async (c) => {
         429,
       );
 
-    if (monthlyTokens > maxQuota.monthly)
+    if (monthlyTokens >= maxQuota.monthly)
       return c.json(
         {
           error: "usage_limit_exceeded",
