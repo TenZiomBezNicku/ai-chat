@@ -102,6 +102,7 @@ for (const provider of providers) {
       {
         name: "AES-GCM",
         iv: provider.iv as Uint8Array<ArrayBuffer>,
+        additionalData: new TextEncoder().encode(provider.id),
       },
       apiKeysEncryptionKey,
       provider.apiKey as Uint8Array<ArrayBuffer>,
