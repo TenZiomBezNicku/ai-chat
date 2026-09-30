@@ -900,21 +900,33 @@ app.patch("/api/v1/admin/provider/:id", async (c) => {
       apiKey?: string;
     };
 
-    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const newProvider: {
+      baseUrl?: string;
+      apiKey?: Buffer<ArrayBuffer>;
+      iv?: Buffer<ArrayBuffer>;
+    } = {};
 
-    const encrypted = await crypto.subtle.encrypt(
-      {
-        name: "AES-GCM",
-        iv,
-        additionalData: new TextEncoder().encode(id),
-      },
-      apiKeysEncryptionKey,
-      new TextEncoder().encode(apiKey),
-    );
+    if (baseUrl) newProvider.baseUrl = baseUrl;
+    if (apiKey) {
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+
+      const encrypted = await crypto.subtle.encrypt(
+        {
+          name: "AES-GCM",
+          iv,
+          additionalData: new TextEncoder().encode(id),
+        },
+        apiKeysEncryptionKey,
+        new TextEncoder().encode(apiKey),
+      );
+
+      newProvider.apiKey = Buffer.from(encrypted);
+      newProvider.iv = Buffer.from(iv);
+    }
 
     await db
       .update(llmProviders)
-      .set({ baseUrl, apiKey: Buffer.from(encrypted), iv: Buffer.from(iv) })
+      .set(newProvider)
       .where(eq(llmProviders.id, id));
 
     return c.json({ message: "Success!" });
