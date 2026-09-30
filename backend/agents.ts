@@ -30,6 +30,9 @@ export async function* startAgent(
 ): AsyncIterable<ChatEvent> {
   const history = [...messages];
 
+  let inputTokens = 0;
+  let outputTokens = 0;
+
   for (let i = 0; i < maxTurns; i++) {
     const res = await chatStream({
       messages: history,
@@ -40,9 +43,6 @@ export async function* startAgent(
 
     let text = "";
     const toolCalls: ToolCall[] = [];
-
-    let inputTokens = 0;
-    let outputTokens = 0;
 
     for await (const chunk of res) {
       if (chunk.type === "text") {
