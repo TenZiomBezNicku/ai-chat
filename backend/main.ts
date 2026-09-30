@@ -1025,7 +1025,11 @@ app.put("/api/v1/admin/websearch", async (c) => {
       })
       .onConflictDoUpdate({
         target: encryptedKV.key,
-        set: { value: encrypted, iv: Buffer.from(iv), updatedAt: new Date() },
+        set: {
+          value: Buffer.from(encrypted),
+          iv: Buffer.from(iv),
+          updatedAt: new Date(),
+        },
       });
 
     tavilyClient = tavily({ apiKey });
