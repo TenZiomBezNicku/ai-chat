@@ -206,7 +206,9 @@ function parseDataUrl(dataUrl: string): {
   };
 }
 
-type AppEnv = { Variables: { userId: string; sessionId: string } };
+type AppEnv = {
+  Variables: { userId: string; sessionId: string; userRole: string };
+};
 
 const app = new Hono<AppEnv>();
 
@@ -247,6 +249,13 @@ app.use("/api/v1/*", async (c, next) => {
 
   c.set("userId", session[0].userId);
   c.set("sessionId", session[0].id);
+
+  const user = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, session[0].userId));
+
+  c.set("userRole", user[0].role);
 
   await next();
 });
@@ -335,84 +344,87 @@ app.post("/api/v1/chat", async (c) => {
     );
   }
 
-  let monthlyTokens = 0;
+  if (c.get("userRole") != "admin") {
+    let monthlyTokens = 0;
 
-  const monthlyUsage = await db
-    .select()
-    .from(userModelUsageMonthly)
-    .where(
-      and(
-        eq(userModelUsageMonthly.userId, c.get("userId")),
-        eq(userModelUsageMonthly.model, reqJson.model),
-      ),
-    );
+    const monthlyUsage = await db
+      .select()
+      .from(userModelUsageMonthly)
+      .where(
+        and(
+          eq(userModelUsageMonthly.userId, c.get("userId")),
+          eq(userModelUsageMonthly.model, reqJson.model),
+        ),
+      );
 
-  if (monthlyUsage.length > 0) {
-    if (
-      monthlyUsage[0].windowStartedAt.getTime() >=
-      30 * 24 * 60 * 60 * 1000 + Date.now()
-    )
-      await db
-        .delete(userModelUsageMonthly)
-        .where(
-          and(
-            eq(userModelUsageMonthly.userId, c.get("userId")),
-            eq(userModelUsageMonthly.model, reqJson.model),
-          ),
-        );
-    else
-      monthlyTokens =
-        monthlyUsage[0].inputTokens + monthlyUsage[0].outputTokens;
+    if (monthlyUsage.length > 0) {
+      if (
+        monthlyUsage[0].windowStartedAt.getTime() >=
+        30 * 24 * 60 * 60 * 1000 + Date.now()
+      )
+        await db
+          .delete(userModelUsageMonthly)
+          .where(
+            and(
+              eq(userModelUsageMonthly.userId, c.get("userId")),
+              eq(userModelUsageMonthly.model, reqJson.model),
+            ),
+          );
+      else
+        monthlyTokens =
+          monthlyUsage[0].inputTokens + monthlyUsage[0].outputTokens;
+    }
+
+    let sessionTokens = 0;
+
+    const sessionUsage = await db
+      .select()
+      .from(userModelUsageSession)
+      .where(
+        and(
+          eq(userModelUsageSession.userId, c.get("userId")),
+          eq(userModelUsageSession.model, reqJson.model),
+        ),
+      );
+
+    if (sessionUsage.length > 0) {
+      if (
+        sessionUsage[0].windowStartedAt.getTime() >=
+        5 * 60 * 60 * 1000 + Date.now()
+      )
+        await db
+          .delete(userModelUsageSession)
+          .where(
+            and(
+              eq(userModelUsageSession.userId, c.get("userId")),
+              eq(userModelUsageSession.model, reqJson.model),
+            ),
+          );
+      else
+        sessionTokens =
+          sessionUsage[0].inputTokens + sessionUsage[0].outputTokens;
+    }
+
+    const maxQuota = await getMaxModelQuota(reqJson.model);
+
+    if (sessionTokens > maxQuota.session)
+      return c.json(
+        {
+          error: "usage_limit_exceeded",
+          message: "You have exceeded your usage limit.",
+        },
+        429,
+      );
+
+    if (monthlyTokens > maxQuota.monthly)
+      return c.json(
+        {
+          error: "usage_limit_exceeded",
+          message: "You have exceeded your usage limit.",
+        },
+        429,
+      );
   }
-
-  let sessionTokens = 0;
-  const sessionUsage = await db
-    .select()
-    .from(userModelUsageSession)
-    .where(
-      and(
-        eq(userModelUsageSession.userId, c.get("userId")),
-        eq(userModelUsageSession.model, reqJson.model),
-      ),
-    );
-
-  if (sessionUsage.length > 0) {
-    if (
-      sessionUsage[0].windowStartedAt.getTime() >=
-      5 * 60 * 60 * 1000 + Date.now()
-    )
-      await db
-        .delete(userModelUsageSession)
-        .where(
-          and(
-            eq(userModelUsageSession.userId, c.get("userId")),
-            eq(userModelUsageSession.model, reqJson.model),
-          ),
-        );
-    else
-      sessionTokens =
-        sessionUsage[0].inputTokens + sessionUsage[0].outputTokens;
-  }
-
-  const maxQuota = await getMaxModelQuota(reqJson.model);
-
-  if (sessionTokens > maxQuota.session)
-    return c.json(
-      {
-        error: "usage_limit_exceeded",
-        message: "You have exceeded your usage limit.",
-      },
-      429,
-    );
-
-  if (monthlyTokens > maxQuota.monthly)
-    return c.json(
-      {
-        error: "usage_limit_exceeded",
-        message: "You have exceeded your usage limit.",
-      },
-      429,
-    );
 
   let chatId = reqJson.chatId;
 
@@ -599,45 +611,47 @@ app.post("/api/v1/chat", async (c) => {
               outputTokens: token.outputTokens,
             });
 
-            await db
-              .insert(userModelUsageMonthly)
-              .values({
-                model: reqJson.model,
-                userId: c.get("userId"),
-                inputTokens: token.inputTokens,
-                outputTokens: token.outputTokens,
-                windowStartedAt: new Date(),
-              })
-              .onConflictDoUpdate({
-                target: [
-                  userModelUsageMonthly.userId,
-                  userModelUsageMonthly.model,
-                ],
-                set: {
-                  inputTokens: sql`${userModelUsageMonthly.inputTokens} + ${token.inputTokens}`,
-                  outputTokens: sql`${userModelUsageMonthly.outputTokens} + ${token.outputTokens}`,
-                },
-              });
+            if (c.get("userRole") != "admin") {
+              await db
+                .insert(userModelUsageMonthly)
+                .values({
+                  model: reqJson.model,
+                  userId: c.get("userId"),
+                  inputTokens: token.inputTokens,
+                  outputTokens: token.outputTokens,
+                  windowStartedAt: new Date(),
+                })
+                .onConflictDoUpdate({
+                  target: [
+                    userModelUsageMonthly.userId,
+                    userModelUsageMonthly.model,
+                  ],
+                  set: {
+                    inputTokens: sql`${userModelUsageMonthly.inputTokens} + ${token.inputTokens}`,
+                    outputTokens: sql`${userModelUsageMonthly.outputTokens} + ${token.outputTokens}`,
+                  },
+                });
 
-            await db
-              .insert(userModelUsageSession)
-              .values({
-                model: reqJson.model,
-                userId: c.get("userId"),
-                inputTokens: token.inputTokens,
-                outputTokens: token.outputTokens,
-                windowStartedAt: new Date(),
-              })
-              .onConflictDoUpdate({
-                target: [
-                  userModelUsageSession.userId,
-                  userModelUsageSession.model,
-                ],
-                set: {
-                  inputTokens: sql`${userModelUsageSession.inputTokens} + ${token.inputTokens}`,
-                  outputTokens: sql`${userModelUsageSession.outputTokens} + ${token.outputTokens}`,
-                },
-              });
+              await db
+                .insert(userModelUsageSession)
+                .values({
+                  model: reqJson.model,
+                  userId: c.get("userId"),
+                  inputTokens: token.inputTokens,
+                  outputTokens: token.outputTokens,
+                  windowStartedAt: new Date(),
+                })
+                .onConflictDoUpdate({
+                  target: [
+                    userModelUsageSession.userId,
+                    userModelUsageSession.model,
+                  ],
+                  set: {
+                    inputTokens: sql`${userModelUsageSession.inputTokens} + ${token.inputTokens}`,
+                    outputTokens: sql`${userModelUsageSession.outputTokens} + ${token.outputTokens}`,
+                  },
+                });
+            }
             break;
 
           case "reasoning":
