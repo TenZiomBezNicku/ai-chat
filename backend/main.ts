@@ -74,6 +74,27 @@ async function importEnvKey(envVar: string) {
 const kvEncryptionKey = await importEnvKey("KV_ENCRYPTION_KEY");
 const apiKeysEncryptionKey = await importEnvKey("API_KEYS_ENCRYPTION_KEY");
 
+async function getEncryptedKV(key: string) {
+  const row = await db
+    .select()
+    .from(encryptedKV)
+    .where(eq(encryptedKV.key, key));
+
+  if (row.length < 1) return undefined;
+
+  const decrypted = await crypto.subtle.decrypt(
+    {
+      name: "AES-GCM",
+      iv: row[0].iv as Uint8Array<ArrayBuffer>,
+      additionalData: new TextEncoder().encode(key),
+    },
+    kvEncryptionKey,
+    row[0].value as Uint8Array<ArrayBuffer>,
+  );
+
+  return new TextDecoder().decode(decrypted);
+}
+
 async function deleteExpiredSessions() {
   await db.delete(sessions).where(lte(sessions.expiresAt, new Date()));
 }
@@ -155,9 +176,11 @@ function registerWebSearch() {
   );
 }
 
-if (configuration.TAVILY_API_KEY) {
+const tavilyApiKey = await getEncryptedKV("config.TAVILY_API_KEY");
+
+if (tavilyApiKey) {
   tavilyClient = tavily({
-    apiKey: JSON.parse(configuration.TAVILY_API_KEY).apiKey,
+    apiKey: tavilyApiKey,
   });
 
   registerWebSearch();
