@@ -218,8 +218,14 @@ export default function App() {
   const refreshModels = useCallback(async () => {
     try {
       const loadedModels = await getModels();
-      setModel(`${loadedModels[0].provider}/${loadedModels[0].name}`);
+
       setModels(loadedModels);
+
+      if (loadedModels.length > 0) {
+        setModel(`${loadedModels[0].provider}/${loadedModels[0].name}`);
+      } else {
+        setModel("");
+      }
     } catch (reason) {
       if (reason instanceof UnauthorizedError) {
         handleUnauthorized();
