@@ -1105,24 +1105,28 @@ app.patch("/api/v1/admin/model/:model", async (c) => {
       is_public?: boolean;
     };
 
-    const maxMonthlyTokens = monthlyQuota ?? 512 * 1024;
-    const maxSessionTokens = sessionQuota ?? 64 * 1024;
-    let isPublic = 0;
+    let isPublic: number | undefined = undefined;
 
     if (is_public === true) isPublic = 1;
+    if (is_public === false) isPublic = 0;
 
     await db
       .insert(modelsSettings)
       .values({
         modelName: model,
-        isPublic,
-        maxMonthlyTokens,
-        maxSessionTokens,
+        isPublic: isPublic ?? 0,
+        maxMonthlyTokens: monthlyQuota ?? 512 * 1024,
+        maxSessionTokens: sessionQuota ?? 64 * 1024,
         updatedAt: new Date(),
       })
       .onConflictDoUpdate({
         target: modelsSettings.modelName,
-        set: { isPublic, maxMonthlyTokens, maxSessionTokens },
+        set: {
+          isPublic,
+          maxMonthlyTokens: monthlyQuota,
+          maxSessionTokens: sessionQuota,
+          updatedAt: new Date(),
+        },
       });
   } else {
     return c.json(
