@@ -5,7 +5,7 @@ import { getConnInfo, serveStatic } from "hono/deno";
 import {
   chat,
   ChatMessage,
-  models,
+  models as getModels,
   providerTypes,
   registerProvider,
 } from "./AI.ts";
@@ -345,6 +345,19 @@ async function getMaxModelQuota(model: string) {
   };
 }
 
+async function isModelPublic(model: string) {
+  const row = await db
+    .select()
+    .from(modelsSettings)
+    .where(eq(modelsSettings.modelName, model));
+
+  if (row.length == 0) {
+    return false;
+  }
+
+  return row[0].isPublic == 1;
+}
+
 app.post("/api/v1/chat", async (c) => {
   const reqJson = (await c.req.json()) as {
     chatId?: string;
@@ -368,6 +381,16 @@ app.post("/api/v1/chat", async (c) => {
   }
 
   if (c.get("userRole") != "admin") {
+    if (!(await isModelPublic(reqJson.model))) {
+      return c.json(
+        {
+          kind: "Forbidden",
+          error: `Model "${reqJson.model}" is not public`,
+        },
+        403,
+      );
+    }
+
     let monthlyTokens = 0;
 
     const monthlyUsage = await db
@@ -808,7 +831,22 @@ app.get("/api/v1/chats", async (c) => {
 });
 
 app.get("/api/v1/models", async (c) => {
-  return c.json(await models());
+  let models = await getModels();
+
+  if (c.get("userRole") != "admin") {
+    const publicModels = new Set(
+      (
+        await db
+          .select({ modelName: modelsSettings.modelName })
+          .from(modelsSettings)
+          .where(eq(modelsSettings.isPublic, 1))
+      ).map((m) => m.modelName),
+    );
+
+    models = models.filter((m) => publicModels.has(`${m.provider}/${m.name}`));
+  }
+
+  return c.json(models);
 });
 
 app.get("/api/v1/attachment/:id", async (c) => {
@@ -885,11 +923,7 @@ app.get("/api/v1/me", async (c) => {
 });
 
 app.get("/api/v1/admin/providers", async (c) => {
-  const userId = c.get("userId");
-
-  const user = await db.select().from(users).where(eq(users.id, userId));
-
-  if (user[0].role == "admin") {
+  if (c.get("userRole") == "admin") {
     const providers = await db
       .select({
         id: llmProviders.id,
@@ -911,11 +945,7 @@ app.get("/api/v1/admin/providers", async (c) => {
 });
 
 app.patch("/api/v1/admin/provider/:id", async (c) => {
-  const userId = c.get("userId");
-
-  const user = await db.select().from(users).where(eq(users.id, userId));
-
-  if (user[0].role == "admin") {
+  if (c.get("userRole") == "admin") {
     const id = c.req.param("id");
 
     const { baseUrl, apiKey } = (await c.req.json()) as {
@@ -965,11 +995,7 @@ app.patch("/api/v1/admin/provider/:id", async (c) => {
 });
 
 app.post("/api/v1/admin/provider", async (c) => {
-  const userId = c.get("userId");
-
-  const user = await db.select().from(users).where(eq(users.id, userId));
-
-  if (user[0].role == "admin") {
+  if (c.get("userRole") == "admin") {
     const { baseUrl, apiKey, id, providerId } = (await c.req.json()) as {
       baseUrl: string;
       apiKey: string;
@@ -1016,11 +1042,7 @@ app.post("/api/v1/admin/provider", async (c) => {
 });
 
 app.put("/api/v1/admin/websearch", async (c) => {
-  const userId = c.get("userId");
-
-  const user = await db.select().from(users).where(eq(users.id, userId));
-
-  if (user[0].role == "admin") {
+  if (c.get("userRole") == "admin") {
     const { apiKey } = await c.req.json();
 
     const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -1062,6 +1084,46 @@ app.put("/api/v1/admin/websearch", async (c) => {
     }
 
     return c.json({ message: "Success!" });
+  } else {
+    return c.json(
+      {
+        error: "Forbidden",
+        message: "The user is not an administrator",
+      },
+      403,
+    );
+  }
+});
+
+app.patch("/api/v1/admin/model/:model", async (c) => {
+  if (c.get("userRole") == "admin") {
+    const model = c.req.param("model");
+
+    const { monthlyQuota, sessionQuota, is_public } = (await c.req.json()) as {
+      monthlyQuota?: number;
+      sessionQuota?: number;
+      is_public?: boolean;
+    };
+
+    const maxMonthlyTokens = monthlyQuota ?? 512 * 1024;
+    const maxSessionTokens = sessionQuota ?? 64 * 1024;
+    let isPublic = 0;
+
+    if (is_public === true) isPublic = 1;
+
+    await db
+      .insert(modelsSettings)
+      .values({
+        modelName: model,
+        isPublic,
+        maxMonthlyTokens,
+        maxSessionTokens,
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: modelsSettings.modelName,
+        set: { isPublic, maxMonthlyTokens, maxSessionTokens },
+      });
   } else {
     return c.json(
       {

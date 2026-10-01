@@ -88,8 +88,7 @@ export const messageAttachments = sqliteTable(
 );
 
 export const modelsSettings = sqliteTable("models_settings", {
-  id: text("id").primaryKey(),
-  modelName: text("model_name").notNull(),
+  modelName: text("model_name").primaryKey(),
   isPublic: integer("is_public").notNull(),
   maxMonthlyTokens: integer("max_monthly_tokens").notNull(),
   maxSessionTokens: integer("max_session_tokens").notNull(),
