@@ -177,7 +177,7 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [models, setModels] = useState([]);
-  const [model, setModel] = useState("ollama/gemma4:e4b");
+  const [model, setModel] = useState("");
   const [me, setMe] = useState<{
     id: string;
     username: string;
@@ -218,6 +218,7 @@ export default function App() {
   const refreshModels = useCallback(async () => {
     try {
       const loadedModels = await getModels();
+      setModel(`${loadedModels[0].provider}/${loadedModels[0].name}`);
       setModels(loadedModels);
     } catch (reason) {
       if (reason instanceof UnauthorizedError) {
