@@ -5,102 +5,73 @@ Chat with LLMs in your browser using Ollama or any OpenAI-compatible API!
 > [!WARNING]
 > This project is still in the early stages of development! Do not use it in a production environment.
 
+## Features
+- Chat with LLMs via Ollama and OpenAI-compatible APIs
+- Streaming responses
+- Image attachments (buggy)
+- Web search
+- Auth system
+- Automatic chat title generation
+- Model selection
+- Automatic admin role assignment for the first user
+- Admin panel
+
+## Planned for the future
+- Image generation
+- Web page access
+- Gemini API support
+- Tool calling emulation for unsupported models
+
 ## Requirements
 - Deno
 - Node.js
 - npm
 - Ollama (optional)
 
-
 ## How to run
 
-1. Rename `backend/.env.example` to `backend/.env`:
-```bash
-mv backend/.env.example backend/.env
-```
-2. Fill in the `backend/.env` file - Open this file in your favorite text editor and fill in the API keys. If you want to disable any backend, for now you have to comment (or remove) it from the code. [How to disable a backend](#how-to-disable-a-backend)
-3. Install frontend dependencies (in `frontend` directory):
-
+1. Install frontend dependencies (in `frontend` directory):
 ```bash
 npm install
 ```
-4. Build frontend (in `frontend` directory):
 
+2. Build frontend (in `frontend` directory):
 ```bash
 npm run build
 ```
-5. Create database (in `backend` directory)
 
+3. Set up the database (in `backend` directory):
 ```bash
 deno run -A npm:drizzle-kit generate
 deno run -A npm:drizzle-kit migrate
 ```
-6. Run backend (in `backend` directory):
 
+4. Run backend (in `backend` directory):
 ```bash
 deno task start
 ```
-7. Go to [http://localhost:3000/](http://localhost:3000/) (the value `3000` corresponds to the port; it will be different if the PORT environment variable is defined - in that case, replace `3000` with the value of the PORT variable).
 
-### How to disable a backend
+5. Open http://localhost:3000 (or the port configured with `PORT`).
+After registering, you should see `Admin Panel` button in the bottom-left corner. Here you can add providers, configure web search via Tavily and manage models.
 
-First, open `backend/main.ts` file in your favorite editor. Then find lines starting with `registerProvider`. You can comment out or remove the corresponding call. For example:
+6. Add providers in admin panel
+Click the add button (`+` icon), then fill all fields. Note: `API Key` is optional for local Ollama.
+Local Ollama base URL is `http://localhost:11434/` but Ollama Cloud base URL is `https://ollama.com/`. OpenAI API base URL is `https://api.openai.com/v1`.
 
-If you want to disable the OpenAI API, change this:
-```ts
-registerProvider(
-  "ollama",
-  new OllamaProvider(new Ollama()),
-);
+## How to set up web search
 
-registerProvider(
-  "ollama_cloud",
-  new OllamaProvider(
-    new Ollama({
-      host: "https://ollama.com/",
-    }),
-  ),
-);
+1. Go to [Tavily](https://www.tavily.com/) and register/login.
+2. Copy generated API key and paste it to `Tavily API Key` field in admin panel, then press `Set` button.
 
-registerProvider("openai", new OpenAIProvider(new OpenAI()));
+## How to change a backend port/address
+
+1. Open `backend/.env` file in your favorite text editor, e.g. with nano:
+```bash
+nano backend/.env
 ```
 
-to this:
+2. Add `PORT` env var on a new line and set it to the desired port, e.g. `PORT=8080`.
 
-```ts
-registerProvider(
-  "ollama",
-  new OllamaProvider(new Ollama()),
-);
+3. Add `HOST` env var on a new line and set it to the desired address, e.g. `HOST=127.0.0.1` (default is 0.0.0.0, which means all addresses).
 
-registerProvider(
-  "ollama_cloud",
-  new OllamaProvider(
-    new Ollama({
-      host: "https://ollama.com/",
-    }),
-  ),
-);
-
-// registerProvider("openai", new OpenAIProvider(new OpenAI()));
-```
-
-Or if you want to disable Ollama Cloud, change to this:
-
-```ts
-registerProvider(
-  "ollama",
-  new OllamaProvider(new Ollama()),
-);
-
-//registerProvider(
-//  "ollama_cloud",
-//  new OllamaProvider(
-//    new Ollama({
-//      host: "https://ollama.com/",
-//    }),
-//  ),
-//);
-
-registerProvider("openai", new OpenAIProvider(new OpenAI()));
-```
+4. Save and exit.
