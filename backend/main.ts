@@ -1095,15 +1095,15 @@ app.put("/api/v1/admin/websearch", async (c) => {
   }
 });
 
-app.patch("/api/v1/admin/model/:model", async (c) => {
+app.patch("/api/v1/admin/model", async (c) => {
   if (c.get("userRole") == "admin") {
-    const model = c.req.param("model");
-
-    const { monthlyQuota, sessionQuota, is_public } = (await c.req.json()) as {
-      monthlyQuota?: number;
-      sessionQuota?: number;
-      is_public?: boolean;
-    };
+    const { monthlyQuota, sessionQuota, is_public, model } =
+      (await c.req.json()) as {
+        monthlyQuota?: number;
+        sessionQuota?: number;
+        is_public?: boolean;
+        model: string;
+      };
 
     let isPublic: number | undefined = undefined;
 
@@ -1128,6 +1128,43 @@ app.patch("/api/v1/admin/model/:model", async (c) => {
           updatedAt: new Date(),
         },
       });
+
+    return c.text("Success");
+  } else {
+    return c.json(
+      {
+        error: "Forbidden",
+        message: "The user is not an administrator",
+      },
+      403,
+    );
+  }
+});
+
+app.get("/api/v1/admin/models", async (c) => {
+  if (c.get("userRole") == "admin") {
+    const modelList = await getModels();
+
+    const modelsInDB = await db
+      .select()
+      .from(modelsSettings)
+      .where(eq(modelsSettings.isPublic, 1));
+
+    const modelsMap = new Map(modelsInDB.map((m) => [m.modelName, m]));
+
+    const models = modelList.map((m) => {
+      const model = modelsMap.get(`${m.provider}/${m.name}`);
+
+      return {
+        isPublic: model?.isPublic ?? 0,
+        provider: m.provider,
+        name: m.name,
+        maxMonthlyTokens: model?.maxMonthlyTokens ?? 512 * 1024,
+        maxSessionTokens: model?.maxSessionTokens ?? 64 * 1024,
+      };
+    });
+
+    return c.json(models);
   } else {
     return c.json(
       {

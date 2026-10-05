@@ -1,6 +1,7 @@
 import { Add } from "@mui/icons-material";
 import { useEffect, useState } from "react";
 import {
+  Checkbox,
   createTheme,
   MenuItem,
   Select,
@@ -19,6 +20,15 @@ export default function AdminPanel() {
   const [namespace, setNamespace] = useState("");
   const [provider, setProvider] = useState("ollama");
   const [addingProvider, setAddingProvider] = useState(false);
+  const [models, setModels] = useState<
+    {
+      isPublic: number;
+      provider: string;
+      name: string;
+      maxMonthlyTokens: number;
+      maxSessionTokens: number;
+    }[]
+  >([]);
 
   useEffect(() => {
     (async () => {
@@ -27,6 +37,14 @@ export default function AdminPanel() {
       const json = await providers.json();
 
       setProviders(json);
+    })();
+
+    (async () => {
+      const models = await fetch("/api/v1/admin/models");
+
+      const json = await models.json();
+
+      setModels(json);
     })();
   }, []);
 
@@ -181,6 +199,70 @@ export default function AdminPanel() {
                   Set
                 </button>
               </ThemeProvider>
+            </div>
+
+            <h3 className="text-xl">Models Settings</h3>
+            <div className="p-4">
+              {models.map((m) => (
+                <div className="p-4">
+                  <h4 className="text-lg">{`${m.provider}/${m.name}`}</h4>
+                  <div>
+                    <ThemeProvider
+                      theme={createTheme({
+                        palette: {
+                          mode: "dark",
+                        },
+                      })}
+                    >
+                      <label>Is Public:</label>
+                      <Checkbox
+                        defaultChecked={m.isPublic == 0 ? false : true}
+                        onChange={async (e) => {
+                          await fetch(`/api/v1/admin/model`, {
+                            method: "PATCH",
+                            body: JSON.stringify({
+                              model: `${m.provider}/${m.name}`,
+                              is_public: e.target.checked,
+                            }),
+                          });
+                        }}
+                      />
+
+                      <br />
+
+                      <TextField
+                        label="Max Monthly Tokens"
+                        type="number"
+                        defaultValue={m.maxMonthlyTokens}
+                        onBlur={async (e) => {
+                          await fetch(`/api/v1/admin/model`, {
+                            method: "PATCH",
+                            body: JSON.stringify({
+                              model: `${m.provider}/${m.name}`,
+                              monthlyQuota: Number(e.target.value),
+                            }),
+                          });
+                        }}
+                      />
+
+                      <TextField
+                        label="Max Session Tokens (5-hour)"
+                        type="number"
+                        defaultValue={m.maxSessionTokens}
+                        onBlur={async (e) => {
+                          await fetch(`/api/v1/admin/model`, {
+                            method: "PATCH",
+                            body: JSON.stringify({
+                              model: `${m.provider}/${m.name}`,
+                              sessionQuota: Number(e.target.value),
+                            }),
+                          });
+                        }}
+                      />
+                    </ThemeProvider>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
