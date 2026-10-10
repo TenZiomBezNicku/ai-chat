@@ -9,8 +9,71 @@ import Chat from "./Chat";
 import NewChat from "./NewChat";
 import Files from "./Files";
 import AdminPanel from "./AdminPanel";
+import Drawer from "@mui/material/Drawer";
+import MenuIcon from "@mui/icons-material/Menu";
+import CloseIcon from "@mui/icons-material/Close";
 
 type ChatSummary = { id: string; title: string | null };
+type SidebarLinksProps = {
+  chats: ChatSummary[];
+  isAdmin: boolean;
+  onNavigate: (pathname: string) => void;
+  onLogout: () => void;
+};
+
+function SidebarLinks({
+  chats,
+  isAdmin,
+  onNavigate,
+  onLogout,
+}: SidebarLinksProps) {
+  return (
+    <>
+      <button
+        className="my-1 h-10 w-[calc(100%-8px)] rounded-lg bg-neutral-800 p-2 text-left hover:bg-neutral-700"
+        onClick={() => onNavigate("/")}
+      >
+        AI Chat
+      </button>
+      <button
+        className="my-1 h-10 w-[calc(100%-8px)] rounded-lg bg-neutral-800 p-2 text-left hover:bg-neutral-700"
+        onClick={() => onNavigate("/files")}
+      >
+        <span className="block truncate">Files</span>
+      </button>
+      <nav className="mt-4 flex-1 overflow-y-auto" aria-label="Chats">
+        {chats.map((currentChat) => (
+          <button
+            className="my-1 h-10 w-[calc(100%-8px)] rounded-lg bg-neutral-800 p-2 text-left hover:bg-neutral-700"
+            key={currentChat.id}
+            onClick={() =>
+              onNavigate(`/c/${encodeURIComponent(currentChat.id)}`)
+            }
+          >
+            <span className="block truncate">
+              {currentChat.title || "Chat"}
+            </span>
+          </button>
+        ))}
+      </nav>
+      {isAdmin ? (
+        <button
+          className="my-1 h-10 w-[calc(100%-8px)] rounded-lg bg-neutral-800 p-2 text-left hover:bg-neutral-700"
+          onClick={() => onNavigate("/admin")}
+        >
+          Admin Panel
+        </button>
+      ) : null}
+      <button
+        className="my-1 h-10 w-[calc(100%-8px)] rounded-lg bg-neutral-800 p-2 text-left hover:bg-neutral-700"
+        onClick={onLogout}
+      >
+        Logout
+      </button>
+    </>
+  );
+}
+
 export type ChatMessage = {
   role: "user" | "assistant";
   content: string;
@@ -176,6 +239,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [models, setModels] = useState([]);
   const [model, setModel] = useState("");
   const [me, setMe] = useState<{
@@ -494,63 +558,69 @@ export default function App() {
     [chatId, handleUnauthorized, navigate, refreshChats, model],
   );
 
+  const logout = useCallback(async () => {
+    await fetch("/api/v1/logout", { method: "DELETE" });
+    location.reload();
+  }, []);
+
+  const navigateFromMobileNav = useCallback(
+    (nextPathname: string) => {
+      setIsMobileNavOpen(false);
+      navigate(nextPathname);
+    },
+    [navigate],
+  );
+
   if (!isAuthenticated) {
     return <AuthScreen onSubmit={authenticate} />;
   }
 
   return (
     <div className="flex min-h-screen">
-      <aside className="fixed left-0 top-0 flex h-screen w-64 flex-col p-3">
-        <button
-          className="my-1 h-10 w-[calc(100%-8px)] rounded-lg bg-neutral-800 p-2 text-left hover:bg-neutral-700"
-          onClick={() => navigate("/")}
-        >
-          AI Chat
-        </button>
-        <button
-          className="my-1 h-10 w-[calc(100%-8px)] rounded-lg bg-neutral-800 p-2 text-left hover:bg-neutral-700"
-          onClick={() => navigate("/files")}
-        >
-          <span className="block truncate">Files</span>
-        </button>
-        <nav className="mt-4 flex-1 overflow-y-auto" aria-label="Chats">
-          {chats.map((currentChat) => (
-            <button
-              className="my-1 h-10 w-[calc(100%-8px)] rounded-lg bg-neutral-800 p-2 text-left hover:bg-neutral-700"
-              key={currentChat.id}
-              onClick={() =>
-                navigate(`/c/${encodeURIComponent(currentChat.id)}`)
-              }
-            >
-              <span className="block truncate">
-                {currentChat.title || "Chat"}
-              </span>
-            </button>
-          ))}
-        </nav>
-        {me?.role === "admin" ? (
-          <button
-            className="my-1 h-10 w-[calc(100%-8px)] rounded-lg bg-neutral-800 p-2 text-left hover:bg-neutral-700"
-            onClick={() => {
-              navigate("/admin");
+      <button
+        type="button"
+        aria-label={isMobileNavOpen ? "Close navigation" : "Open navigation"}
+        aria-expanded={isMobileNavOpen}
+        className="fixed left-2 top-2 z-1400 flex size-10 items-center justify-center rounded-lg bg-neutral-800 text-white shadow md:hidden"
+        onClick={() => setIsMobileNavOpen((open) => !open)}
+      >
+        {isMobileNavOpen ? <CloseIcon /> : <MenuIcon />}
+      </button>
+      <Drawer
+        anchor="left"
+        open={isMobileNavOpen}
+        onClose={() => setIsMobileNavOpen(false)}
+        sx={{
+          "& .MuiDrawer-paper": {
+            width: "92vw",
+            backgroundColor: "#101010",
+            color: "white",
+            borderRight: "1px solid #262626",
+          },
+        }}
+      >
+        <aside className="flex h-dvh flex-col overflow-y-auto p-3 pt-14">
+          <SidebarLinks
+            chats={chats}
+            isAdmin={me?.role === "admin"}
+            onNavigate={navigateFromMobileNav}
+            onLogout={() => {
+              setIsMobileNavOpen(false);
+              void logout();
             }}
-          >
-            Admin Panel
-          </button>
-        ) : null}
-        <button
-          className="my-1 h-10 w-[calc(100%-8px)] rounded-lg bg-neutral-800 p-2 text-left hover:bg-neutral-700"
-          onClick={async () => {
-            await fetch("/api/v1/logout", { method: "DELETE" });
-
-            location.reload();
-          }}
-        >
-          Logout
-        </button>
+          />
+        </aside>
+      </Drawer>
+      <aside className="fixed left-0 top-0 z-20 hidden h-screen w-64 flex-col p-3 md:flex">
+        <SidebarLinks
+          chats={chats}
+          isAdmin={me?.role === "admin"}
+          onNavigate={navigate}
+          onLogout={() => void logout()}
+        />
       </aside>
 
-      <main className="ml-64 flex min-w-0 flex-1">
+      <main className="flex min-w-0 flex-1 pt-24 md:ml-64 md:pt-0">
         {error && (
           <p className="fixed right-4 top-4 z-10 rounded bg-red-950 p-3 text-sm">
             {error}
@@ -558,7 +628,7 @@ export default function App() {
         )}
         {!(pathIsAdmin(pathname) || pathIsFiles(pathname)) ? (
           <select
-            className="fixed p-4"
+            className="fixed right-2 top-14 z-10 max-w-[calc(100vw-1rem)] p-2 md:right-auto md:top-auto md:max-w-none md:p-4"
             onChange={(e) => {
               setModel(e.target.value);
             }}

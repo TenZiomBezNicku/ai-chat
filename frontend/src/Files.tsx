@@ -22,9 +22,9 @@ export default function Files() {
 
   return (
     <div className="min-h-screen">
-      <div className="p-8">
+      <div className="p-4 md:p-8">
         <h1 className="text-3xl">User files</h1>
-        <div>
+        <div className="flex flex-wrap gap-2 md:block md:gap-0">
           {files.map((v) => {
             if (v.mimeType.startsWith("image/")) {
               return (
@@ -42,7 +42,7 @@ export default function Files() {
               return (
                 <div
                   style={{
-                    width: "256px",
+                    width: "min(256px, 100%)",
                     height: "128px",
                     borderWidth: "1px",
                     borderRadius: "8px",

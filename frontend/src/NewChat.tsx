@@ -101,11 +101,11 @@ export default function NewChat({
   }
 
   return (
-    <div className="flex min-h-screen flex-1 items-center justify-center">
-      <div className="flex w-full flex-col items-center">
-        <h1 className="mb-8 text-3xl">{welcomeText}</h1>
+    <div className="flex min-h-[calc(100dvh-6rem)] flex-1 items-center justify-center md:min-h-screen">
+      <div className="flex w-full flex-col items-center px-4 md:px-0">
+        <h1 className="mb-8 text-center text-2xl md:text-left md:text-3xl">{welcomeText}</h1>
         <form
-          className="w-1/2 items-center rounded-4xl bg-neutral-700 p-4"
+          className="w-full items-center rounded-4xl bg-neutral-700 p-3 md:w-1/2 md:p-4"
           onSubmit={(event) => {
             event.preventDefault();
             void submit();

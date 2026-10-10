@@ -75,13 +75,13 @@ export default function Chat({
   }
 
   return (
-    <div className="flex min-h-screen flex-1 justify-center pb-28">
-      <div className="w-4/7 wrap-break-word py-4">
+    <div className="flex min-h-[calc(100dvh-6rem)] flex-1 justify-center pb-28 md:min-h-screen">
+      <div className="w-full wrap-break-word px-4 py-4 md:w-4/7 md:px-0">
         {messages.map((currentMessage, index) => (
           <div
             className={
               currentMessage.role === "user"
-                ? "my-8 ml-auto w-2/3 whitespace-pre-wrap rounded bg-neutral-700 p-2 prose prose-invert max-w-none"
+                ? "my-8 ml-auto w-[90%] whitespace-pre-wrap rounded bg-neutral-700 p-2 prose prose-invert max-w-none md:w-2/3"
                 : "my-8 w-full whitespace-pre-wrap prose prose-invert max-w-none"
             }
             key={`${currentMessage.role}-${index}`}
@@ -106,13 +106,13 @@ export default function Chat({
         ))}
       </div>
       <form
-        className="fixed bottom-6 flex w-full flex-col items-center"
+        className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] flex w-full flex-col items-center px-3 md:bottom-6 md:px-0"
         onSubmit={(event) => {
           event.preventDefault();
           void submit();
         }}
       >
-        <div className="flex">
+          <div className="flex max-w-full overflow-x-auto md:max-w-none md:overflow-visible">
           {images.map((image, index) => (
             <div
               key={image.url}
@@ -149,7 +149,7 @@ export default function Chat({
             </div>
           ))}
         </div>
-        <div className="flex w-1/2 items-center rounded-4xl bg-neutral-700 p-4">
+        <div className="flex w-full items-center rounded-4xl bg-neutral-700 p-3 md:w-1/2 md:p-4">
           <button
             type="button"
             aria-label="Add attachment"

@@ -50,7 +50,7 @@ export default function AdminPanel() {
 
   return (
     <div className="min-h-screen">
-      <div className="p-8">
+      <div className="p-4 md:p-8">
         <h1 className="text-3xl">Admin settings</h1>
         <div>
           <div>
@@ -64,8 +64,8 @@ export default function AdminPanel() {
             </button>
 
             {addingProvider ? (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-                <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-neutral-800">
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 md:p-0">
+                <div className="max-h-full w-full max-w-md overflow-y-auto rounded-xl bg-white p-5 shadow-xl dark:bg-neutral-800 md:max-h-none md:overflow-visible md:p-6">
                   <h2 className="text-lg font-semibold">Add Provider</h2>
 
                   <br />
@@ -233,6 +233,7 @@ export default function AdminPanel() {
                       <TextField
                         label="Max Monthly Tokens"
                         type="number"
+                        className="w-full md:w-55.75"
                         defaultValue={m.maxMonthlyTokens}
                         onBlur={async (e) => {
                           await fetch(`/api/v1/admin/model`, {
@@ -248,6 +249,7 @@ export default function AdminPanel() {
                       <TextField
                         label="Max Session Tokens (5-hour)"
                         type="number"
+                        className="w-full md:w-55.75"
                         defaultValue={m.maxSessionTokens}
                         onBlur={async (e) => {
                           await fetch(`/api/v1/admin/model`, {
