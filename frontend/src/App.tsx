@@ -565,7 +565,7 @@ export default function App() {
             value={model}
           >
             {models.map((m: any) => (
-              <option value={`${m.provider}/${m.name}`}>
+              <option className="text-black" value={`${m.provider}/${m.name}`}>
                 {m.name} - {m.provider}
               </option>
             ))}
