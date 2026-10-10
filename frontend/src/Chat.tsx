@@ -112,72 +112,74 @@ export default function Chat({
           void submit();
         }}
       >
+        <div className="w-full rounded-4xl bg-neutral-700 p-3 md:w-1/2 md:p-4">
           <div className="flex max-w-full overflow-x-auto md:max-w-none md:overflow-visible">
-          {images.map((image, index) => (
-            <div
-              key={image.url}
-              style={{
-                position: "relative",
-                width: "96px",
-                margin: "8px",
-              }}
-            >
-              <img
-                src={image.url}
+            {images.map((image, index) => (
+              <div
+                key={image.url}
                 style={{
-                  borderRadius: "8px",
-                  aspectRatio: "1 / 1",
-                  objectFit: "cover",
-                }}
-              />
-              <button
-                type="button"
-                aria-label="Remove attachment"
-                style={{
-                  position: "absolute",
-                  top: "6px",
-                  right: "6px",
-                }}
-                onClick={() => {
-                  setImages((current) =>
-                    current.filter((_, currentIndex) => currentIndex !== index),
-                  );
+                  position: "relative",
+                  width: "96px",
+                  margin: "8px",
                 }}
               >
-                <Close />
-              </button>
-            </div>
-          ))}
-        </div>
-        <div className="flex w-full items-center rounded-4xl bg-neutral-700 p-3 md:w-1/2 md:p-4">
-          <button
-            type="button"
-            aria-label="Add attachment"
-            onClick={openFilePicker}
-          >
-            <AddIcon />
-          </button>
-          <textarea
-            placeholder="Ask for anything"
-            aria-label="Message"
-            className="mx-2 h-6 w-full resize-none outline-0"
-            value={message}
-            onChange={(event) => {
-              setMessage(event.target.value);
+                <img
+                  src={image.url}
+                  style={{
+                    borderRadius: "8px",
+                    aspectRatio: "1 / 1",
+                    objectFit: "cover",
+                  }}
+                />
+                <button
+                  type="button"
+                  aria-label="Remove attachment"
+                  style={{
+                    position: "absolute",
+                    top: "6px",
+                    right: "6px",
+                  }}
+                  onClick={() => {
+                    setImages((current) =>
+                      current.filter((_, currentIndex) => currentIndex !== index),
+                    );
+                  }}
+                >
+                  <Close />
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="flex w-full items-center">
+            <button
+              type="button"
+              aria-label="Add attachment"
+              onClick={openFilePicker}
+            >
+              <AddIcon />
+            </button>
+            <textarea
+              placeholder="Ask for anything"
+              aria-label="Message"
+              className="mx-2 h-6 w-full resize-none outline-0"
+              value={message}
+              onChange={(event) => {
+                setMessage(event.target.value);
 
-              event.target.style.height = "24px";
-              event.target.style.height = `${event.target.scrollHeight}px`;
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                event.currentTarget.form?.requestSubmit();
-              }
-            }}
-          />
-          <button type="submit" aria-label="Send message" disabled={!canSend}>
-            <NorthIcon />
-          </button>
+                event.target.style.height = "24px";
+                event.target.style.height = `${event.target.scrollHeight}px`;
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  event.currentTarget.form?.requestSubmit();
+                }
+              }}
+            />
+            <button type="submit" aria-label="Send message" disabled={!canSend}>
+              <NorthIcon />
+            </button>
+          </div>
         </div>
       </form>
       <input
