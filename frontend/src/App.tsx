@@ -399,7 +399,11 @@ export default function App() {
   );
 
   const send = useCallback(
-    async (rawMessage: string, attachments: string[]) => {
+    async (
+      rawMessage: string,
+      attachments: string[],
+      setMessage: React.Dispatch<React.SetStateAction<string>>,
+    ) => {
       const message = rawMessage.trim();
       if (!message || sendingRef.current) return false;
 
@@ -447,6 +451,8 @@ export default function App() {
         }
         if (!response.ok || !response.body)
           throw new Error("Unable to send the message.");
+
+        setMessage("");
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();

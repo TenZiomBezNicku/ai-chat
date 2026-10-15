@@ -10,7 +10,11 @@ export default function Chat({
   messages,
   isSending,
 }: {
-  send: (message: string, attachments: string[]) => Promise<boolean>;
+  send: (
+    message: string,
+    attachments: string[],
+    setMessage: React.Dispatch<React.SetStateAction<string>>,
+  ) => Promise<boolean>;
   messages: ChatMessage[];
   isSending: boolean;
 }) {
@@ -29,7 +33,6 @@ export default function Chat({
     if (!canSend) return;
 
     const outgoingMessage = message;
-    setMessage("");
 
     const attachments: string[] = [];
 
@@ -37,7 +40,7 @@ export default function Chat({
       attachments.push(await fileToBase64(image.file));
     }
 
-    void send(outgoingMessage, attachments);
+    void send(outgoingMessage, attachments, setMessage);
   };
 
   function openFilePicker() {
@@ -141,7 +144,9 @@ export default function Chat({
                   }}
                   onClick={() => {
                     setImages((current) =>
-                      current.filter((_, currentIndex) => currentIndex !== index),
+                      current.filter(
+                        (_, currentIndex) => currentIndex !== index,
+                      ),
                     );
                   }}
                 >

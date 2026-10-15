@@ -29,7 +29,11 @@ export default function NewChat({
   send,
   isSending,
 }: {
-  send: (message: string, attachments: string[]) => Promise<boolean>;
+  send: (
+    message: string,
+    attachments: string[],
+    setMessage: React.Dispatch<React.SetStateAction<string>>,
+  ) => Promise<boolean>;
   isSending: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -58,7 +62,7 @@ export default function NewChat({
       imgs.push(await fileToBase64(img.file));
     }
 
-    void send(outgoingMessage, imgs);
+    void send(outgoingMessage, imgs, setMessage);
   };
 
   function openFilePicker() {
@@ -95,7 +99,6 @@ export default function NewChat({
       return;
     }
 
-    // URL do pokazania w <img>
     const url = URL.createObjectURL(file);
     setImages([...images, { url, file }]);
   }
