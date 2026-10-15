@@ -26,6 +26,7 @@ export async function* startAgent(
   messages: ChatMessage[],
   model: string,
   maxTurns: number = 6,
+  availableTools?: string[],
   system?: string,
 ): AsyncIterable<ChatEvent> {
   const history = [...messages];
@@ -33,12 +34,16 @@ export async function* startAgent(
   let inputTokens = 0;
   let outputTokens = 0;
 
+  if (!availableTools) availableTools = tools.map((v) => v.name);
+
+  const usedTools = tools.filter((t) => availableTools.includes(t.name));
+
   for (let i = 0; i < maxTurns; i++) {
     const res = await chatStream({
       messages: history,
       system,
       model,
-      tools: tools,
+      tools: usedTools,
     });
 
     let text = "";

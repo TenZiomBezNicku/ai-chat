@@ -213,6 +213,8 @@ registerTool(
   },
 );
 
+const defaultTools = ["get_current_time", "web_search"];
+
 function parseDataUrl(dataUrl: string): {
   mimeType: string;
   base64: string;
@@ -635,6 +637,7 @@ app.post("/api/v1/chat", async (c) => {
         finalMessages as ChatMessage[],
         reqJson.model,
         16,
+        [...defaultTools],
       );
 
       let res = "";
