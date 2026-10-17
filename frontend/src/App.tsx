@@ -12,6 +12,7 @@ import AdminPanel from "./AdminPanel";
 import Drawer from "@mui/material/Drawer";
 import MenuIcon from "@mui/icons-material/Menu";
 import CloseIcon from "@mui/icons-material/Close";
+import Settings from "./Settings";
 
 type ChatSummary = { id: string; title: string | null };
 type SidebarLinksProps = {
@@ -64,6 +65,12 @@ function SidebarLinks({
           Admin Panel
         </button>
       ) : null}
+      <button
+        className="my-1 h-10 w-[calc(100%-8px)] rounded-lg bg-neutral-800 p-2 text-left hover:bg-neutral-700"
+        onClick={() => onNavigate("/settings")}
+      >
+        Settings
+      </button>
       <button
         className="my-1 h-10 w-[calc(100%-8px)] rounded-lg bg-neutral-800 p-2 text-left hover:bg-neutral-700"
         onClick={onLogout}
@@ -154,6 +161,11 @@ function pathIsFiles(pathname: string) {
 
 function pathIsAdmin(pathname: string) {
   if (pathname == "/admin") return true;
+  return false;
+}
+
+function pathIsSettings(pathname: string) {
+  if (pathname == "/settings") return true;
   return false;
 }
 
@@ -286,7 +298,10 @@ export default function App() {
       setModels(loadedModels);
 
       if (loadedModels.length > 0) {
-        setModel(`${loadedModels[0].provider}/${loadedModels[0].name}`);
+        const defaultModel = localStorage.getItem("defaultModel");
+
+        if (defaultModel) setModel(defaultModel);
+        else setModel(`${loadedModels[0].provider}/${loadedModels[0].name}`);
       } else {
         setModel("");
       }
@@ -632,7 +647,11 @@ export default function App() {
             {error}
           </p>
         )}
-        {!(pathIsAdmin(pathname) || pathIsFiles(pathname)) ? (
+        {!(
+          pathIsAdmin(pathname) ||
+          pathIsFiles(pathname) ||
+          pathIsSettings(pathname)
+        ) ? (
           <select
             className="fixed right-2 top-14 z-10 max-w-[calc(100vw-1rem)] p-2 md:right-auto md:top-auto md:max-w-none md:p-4"
             onChange={(e) => {
@@ -653,6 +672,8 @@ export default function App() {
           <Files />
         ) : pathIsAdmin(pathname) ? (
           <AdminPanel />
+        ) : pathIsSettings(pathname) ? (
+          <Settings />
         ) : (
           <NewChat send={send} isSending={isSending} />
         )}

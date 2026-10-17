@@ -1299,7 +1299,7 @@ app.use(
 
 app.on(
   "GET",
-  ["/", "/c/:id", "/files", "/admin"],
+  ["/", "/c/:id", "/files", "/admin", "/settings"],
   serveStatic({
     path: "./dist/index.html",
   }),
