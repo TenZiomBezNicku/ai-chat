@@ -21,7 +21,7 @@ export default function Chat({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [message, setMessage] = useState("");
-  const [images, setImages] = useState<
+  const [attachments, setAttachments] = useState<
     {
       file: File;
       url: string;
@@ -34,13 +34,13 @@ export default function Chat({
 
     const outgoingMessage = message;
 
-    const attachments: string[] = [];
+    const attachs: string[] = [];
 
-    for (const image of images) {
-      attachments.push(await fileToBase64(image.file));
+    for (const attach of attachments) {
+      attachs.push(await fileToBase64(attach.file));
     }
 
-    void send(outgoingMessage, attachments, setMessage);
+    void send(outgoingMessage, attachs, setMessage);
   };
 
   function openFilePicker() {
@@ -71,10 +71,10 @@ export default function Chat({
   function handleFile(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
 
-    if (!file || !file.type.startsWith("image/")) return;
+    if (!file) return;
 
     const url = URL.createObjectURL(file);
-    setImages((current) => [...current, { url, file }]);
+    setAttachments([...attachments, { url, file }]);
   }
 
   return (
@@ -117,23 +117,28 @@ export default function Chat({
       >
         <div className="w-full rounded-4xl bg-neutral-700 p-3 md:w-1/2 md:p-4">
           <div className="flex max-w-full overflow-x-auto md:max-w-none md:overflow-visible">
-            {images.map((image, index) => (
+            {attachments.map((attachment, index) => (
               <div
-                key={image.url}
+                key={attachment.url}
                 style={{
                   position: "relative",
                   width: "96px",
                   margin: "8px",
                 }}
               >
-                <img
-                  src={image.url}
-                  style={{
-                    borderRadius: "8px",
-                    aspectRatio: "1 / 1",
-                    objectFit: "cover",
-                  }}
-                />
+                {attachment.file.type.startsWith("image/") ? (
+                  <img
+                    src={attachment.url}
+                    style={{
+                      borderRadius: "8px",
+                      aspectRatio: "1 / 1",
+                      objectFit: "cover",
+                    }}
+                  />
+                ) : (
+                  <p>{attachment.file.name}</p>
+                )}
+
                 <button
                   type="button"
                   aria-label="Remove attachment"
@@ -143,7 +148,7 @@ export default function Chat({
                     right: "6px",
                   }}
                   onClick={() => {
-                    setImages((current) =>
+                    setAttachments((current) =>
                       current.filter(
                         (_, currentIndex) => currentIndex !== index,
                       ),

@@ -42,7 +42,7 @@ export default function NewChat({
   const [welcomeText] = useState(
     () => welcomeTexts[Math.floor(Math.random() * welcomeTexts.length)],
   );
-  const [images, setImages] = useState<
+  const [attachments, setAttachments] = useState<
     {
       file: File;
       url: string;
@@ -56,13 +56,13 @@ export default function NewChat({
     const outgoingMessage = message;
     setMessage("");
 
-    const imgs: string[] = [];
+    const attachs: string[] = [];
 
-    for (const img of images) {
-      imgs.push(await fileToBase64(img.file));
+    for (const attach of attachments) {
+      attachs.push(await fileToBase64(attach.file));
     }
 
-    void send(outgoingMessage, imgs, setMessage);
+    void send(outgoingMessage, attachs, setMessage);
   };
 
   function openFilePicker() {
@@ -95,12 +95,8 @@ export default function NewChat({
 
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      return;
-    }
-
     const url = URL.createObjectURL(file);
-    setImages([...images, { url, file }]);
+    setAttachments([...attachments, { url, file }]);
   }
 
   return (
@@ -117,23 +113,32 @@ export default function NewChat({
           }}
         >
           <div className="flex">
-            {images.map((img, idx) => (
+            {attachments.map((attachment, idx) => (
               <div
-                key={img.url}
+                key={attachment.url}
                 style={{
                   position: "relative",
-                  width: "96px",
+                  height: "96px",
                   margin: "8px",
+                  ...(attachment.file.type.startsWith("image/")
+                    ? { width: "96px" }
+                    : {}),
                 }}
               >
-                <img
-                  src={img.url}
-                  style={{
-                    borderRadius: "8px",
-                    aspectRatio: "1 / 1",
-                    objectFit: "cover",
-                  }}
-                />
+                {attachment.file.type.startsWith("image/") ? (
+                  <img
+                    src={attachment.url}
+                    style={{
+                      borderRadius: "8px",
+                      aspectRatio: "1 / 1",
+                      objectFit: "cover",
+                    }}
+                  />
+                ) : (
+                  <div className="pr-8">
+                    <p>{attachment.file.name}</p>
+                  </div>
+                )}
 
                 <button
                   type="button"
@@ -144,7 +149,7 @@ export default function NewChat({
                     right: "6px",
                   }}
                   onClick={() => {
-                    setImages((prev) => prev.filter((_, i) => i !== idx));
+                    setAttachments((prev) => prev.filter((_, i) => i !== idx));
                   }}
                 >
                   <Close />
@@ -184,13 +189,7 @@ export default function NewChat({
           </div>
         </form>
       </div>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        onChange={handleFile}
-        hidden
-      />
+      <input ref={inputRef} type="file" onChange={handleFile} hidden />
     </div>
   );
 }

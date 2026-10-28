@@ -524,6 +524,8 @@ app.post("/api/v1/chat", async (c) => {
 
   const attachmentsEndpoints: string[] = [];
 
+  let uploadedBytes = 0;
+
   for (const attachment of attachments) {
     const parsed = parseDataUrl(attachment);
 
@@ -532,6 +534,15 @@ app.post("/api/v1/chat", async (c) => {
     }
 
     const fileBytes = Uint8Array.fromBase64(parsed.base64);
+
+    uploadedBytes += fileBytes.byteLength;
+
+    if (uploadedBytes > Number(configuration.max_file_size ?? 32 * 1024 * 1024))
+      return c.json(
+        { ok: false, message: "Attachments size limit exceeded" },
+        413,
+      );
+
     const attachmentHash = encodeHex(
       await crypto.subtle.digest("SHA-256", fileBytes),
     );
