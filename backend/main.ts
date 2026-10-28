@@ -34,6 +34,9 @@ import { hash, verify } from "bcrypt";
 import { decodeHex, encodeHex } from "@std/encoding/hex";
 import { rateLimiter } from "hono-rate-limiter";
 import { Buffer } from "node:buffer";
+import { DOMParser } from "linkedom";
+import TurndownService from "turndown";
+import ipaddr from "ipaddr.js";
 
 import "./genenv.ts";
 
@@ -213,7 +216,129 @@ registerTool(
   },
 );
 
-const defaultTools = ["get_current_time", "web_search"];
+export function isPublicIp(ip: string): boolean {
+  try {
+    const address = ipaddr.process(ip);
+
+    return address.range() === "unicast";
+  } catch {
+    return false;
+  }
+}
+
+export async function isSafeUrl(input: string): Promise<boolean> {
+  try {
+    const url = new URL(input);
+
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return false;
+    }
+
+    if (url.username || url.password) return false;
+
+    const hostname = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+
+    if (
+      hostname === "localhost" ||
+      hostname.endsWith(".localhost") ||
+      hostname.endsWith(".local")
+    ) {
+      return false;
+    }
+
+    if (ipaddr.isValid(hostname)) {
+      return isPublicIp(hostname);
+    }
+
+    const results = await Promise.allSettled([
+      Deno.resolveDns(hostname, "A"),
+      Deno.resolveDns(hostname, "AAAA"),
+    ]);
+
+    const ips: string[] = [];
+
+    for (const result of results) {
+      if (result.status === "fulfilled") {
+        ips.push(...result.value);
+      }
+    }
+
+    if (ips.length === 0) return false;
+
+    return ips.every(isPublicIp);
+  } catch {
+    return false;
+  }
+}
+
+registerTool(
+  async (args) => {
+    const { url } = JSON.parse(args);
+
+    console.log(url);
+
+    if (!isSafeUrl(url))
+      throw new Error("Access to non-public IP addresses is not allowed");
+
+    const response = await fetch(url);
+    const html = await response.text();
+
+    const document = new DOMParser().parseFromString(html, "text/html");
+
+    if (!document) {
+      throw new Error("Failed to parse HTML");
+    }
+
+    document
+      .querySelectorAll("script, style, nav, footer, iframe, noscript")
+      .forEach((el: { remove(): void }) => el.remove());
+
+    document
+      .querySelectorAll("a[href]")
+      .forEach(
+        (el: {
+          getAttribute(name: string): string | null;
+          setAttribute(name: string, value: string): void;
+          removeAttribute(name: string): void;
+        }) => {
+          const href = el.getAttribute("href");
+          if (!href) return;
+
+          try {
+            el.setAttribute("href", new URL(href, url).href);
+          } catch {
+            el.removeAttribute("href");
+          }
+        },
+      );
+
+    const turndown = new TurndownService({
+      headingStyle: "atx",
+      codeBlockStyle: "fenced",
+      bulletListMarker: "-",
+    });
+
+    const cleanedHtml = document.body.innerHTML;
+    const markdown = turndown.turndown(cleanedHtml);
+
+    return JSON.stringify({
+      title: document.title,
+      markdown,
+    });
+  },
+  {
+    name: "web_fetch",
+    description: "Fetches a webpage and returns it in Markdown format",
+    parameters: {
+      type: "object",
+      properties: { url: { type: "string", description: "Web page URL" } },
+      required: ["url"],
+      additionalProperties: false,
+    },
+  },
+);
+
+const defaultTools = ["get_current_time", "web_search", "web_fetch"];
 
 function parseDataUrl(dataUrl: string): {
   mimeType: string;
