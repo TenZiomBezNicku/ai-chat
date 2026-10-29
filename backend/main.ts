@@ -277,7 +277,7 @@ registerTool(
 
     console.log(url);
 
-    if (!isSafeUrl(url))
+    if (!(await isSafeUrl(url)))
       throw new Error("Access to non-public IP addresses is not allowed");
 
     const response = await fetch(url);
