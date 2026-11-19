@@ -32,7 +32,9 @@ function toOllamaMessage(message: ChatMessage): Message {
     return {
       role: message.role,
       content: message.content,
-      images: message.images,
+      images: message.images?.map((image) =>
+        image.replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, ""),
+      ),
     };
   } else {
     return {

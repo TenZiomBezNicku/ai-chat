@@ -731,7 +731,9 @@ app.post("/api/v1/chat", async (c) => {
       ...msg,
       images: chatAttachments.flatMap((img) => {
         if (img.mimeType.startsWith("image/")) {
-          return [Deno.readFileSync(img.path).toBase64()];
+          return [
+            Deno.readFileSync(img.path).toBase64({ alphabet: "base64url" }),
+          ];
         }
         return [];
       }),

@@ -10,46 +10,67 @@ import {
 function toOpenAIInput(
   messages: ChatMessage[],
 ): OpenAI.Responses.ResponseInput {
-  const input = messages.flatMap((message): unknown[] => {
-    if (message.role === "tool") {
-      return [
-        {
-          type: "function_call_output" as const,
+  return messages.flatMap(
+    (message): OpenAI.Responses.ResponseInput => {
+      if (message.role === "tool") {
+        return [{
+          type: "function_call_output",
           call_id: message.toolCallId,
           output: message.content,
-        },
-      ];
-    }
+        }];
+      }
 
-    if (message.role === "assistant" && message.toolCalls?.length) {
-      return [
-        ...(message.content
-          ? [
-              {
-                type: "message" as const,
-                role: "assistant" as const,
-                content: message.content,
-              },
-            ]
-          : []),
-        ...message.toolCalls.map((toolCall) => ({
-          type: "function_call" as const,
-          call_id: toolCall.id,
-          name: toolCall.name,
-          arguments: toolCall.arguments,
-        })),
-      ];
-    }
+      if (message.role === "assistant" && message.toolCalls?.length) {
+        const result: OpenAI.Responses.ResponseInput = [];
 
-    return [
-      {
-        role: message.role,
+        if (message.content) {
+          result.push({
+            type: "message",
+            role: "assistant",
+            content: message.content,
+          });
+        }
+
+        for (const toolCall of message.toolCalls) {
+          result.push({
+            type: "function_call",
+            call_id: toolCall.id,
+            name: toolCall.name,
+            arguments: toolCall.arguments,
+          });
+        }
+
+        return result;
+      }
+
+      if (message.role === "user") {
+        const content: OpenAI.Responses.ResponseInputContent[] = [
+          {
+            type: "input_text",
+            text: message.content,
+          },
+        ];
+
+        for (const image of message.images ?? []) {
+          content.push({
+            type: "input_image",
+            image_url: image,
+            detail: "auto",
+          });
+        }
+
+        return [{
+          role: "user",
+          content,
+        }];
+      }
+
+      return [{
+        role: "assistant",
         content: message.content,
-      },
-    ];
-  });
-
-  return input as OpenAI.Responses.ResponseInput;
+      }];
+    },
+  );
 }
 
 function toOpenAIResponsesTools(
