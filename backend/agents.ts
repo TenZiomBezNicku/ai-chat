@@ -7,11 +7,17 @@ import {
 } from "./AI.ts";
 
 const tools: ToolDefinition[] = [];
-const functions: Map<string, (args: string) => Promise<string> | string> =
-  new Map();
+const functions: Map<
+  string,
+  (args: string, chatId: string, userId: string) => Promise<string> | string
+> = new Map();
 
 export function registerTool(
-  func: (args: string) => Promise<string> | string,
+  func: (
+    args: string,
+    chatId: string,
+    userId: string,
+  ) => Promise<string> | string,
   tool: ToolDefinition,
 ) {
   if (functions.has(tool.name)) {
@@ -25,6 +31,8 @@ export function registerTool(
 export async function* startAgent(
   messages: ChatMessage[],
   model: string,
+  chatId: string,
+  userId: string,
   maxTurns: number = 6,
   availableTools?: string[],
   system?: string,
@@ -87,7 +95,7 @@ export async function* startAgent(
       }
 
       try {
-        const result = await func(toolCall.arguments);
+        const result = await func(toolCall.arguments, chatId, userId);
 
         history.push({
           role: "tool",

@@ -338,7 +338,79 @@ registerTool(
   },
 );
 
-const defaultTools = ["get_current_time", "web_search", "web_fetch"];
+registerTool(
+  async (args, chatId, userId) => {
+    const { id } = JSON.parse(args);
+
+    const [attachment] = await db
+      .select({
+        id: attachs.id,
+        name: attachs.name,
+        path: attachs.path,
+        mimeType: attachs.mimeType,
+        size: attachs.size,
+      })
+      .from(attachs)
+      .innerJoin(
+        messageAttachments,
+        eq(messageAttachments.attachmentId, attachs.id),
+      )
+      .innerJoin(messages, eq(messages.id, messageAttachments.messageId))
+      .innerJoin(chats, eq(chats.id, messages.chatId))
+      .where(
+        and(
+          eq(attachs.id, id),
+          eq(attachs.userId, userId),
+          eq(chats.id, chatId),
+          eq(chats.userId, userId),
+        ),
+      )
+      .limit(1);
+
+    if (!attachment) {
+      throw new Error("Attachment not found in this chat");
+    }
+
+    if (
+      !attachment.mimeType.startsWith("text/") &&
+      attachment.mimeType != "application/json"
+    )
+      throw new Error(
+        "This file is not a text file and cannot be read as text. Do not retry this operation.",
+      );
+
+    return JSON.stringify({
+      size: attachment.size,
+      id: attachment.id,
+      name: attachment.name,
+      content: await Deno.readTextFile(attachment.path),
+    });
+  },
+  {
+    name: "get_attachment",
+    parameters: {
+      type: "object",
+      properties: {
+        id: {
+          type: "string",
+          description:
+            "The unique ID of the attachment to read. Must match an attachment ID listed in the conversation context.",
+        },
+      },
+      required: ["id"],
+      additionalProperties: false,
+    },
+    description:
+      "Read the contents of an attachment from the current chat. Use this tool when you need to inspect an attached file that is not directly available in the conversation context.",
+  },
+);
+
+const defaultTools = [
+  "get_current_time",
+  "web_search",
+  "web_fetch",
+  "get_attachment",
+];
 
 function parseDataUrl(dataUrl: string): {
   mimeType: string;
@@ -697,7 +769,7 @@ app.post("/api/v1/chat", async (c) => {
         path: `./data/attachments/${attachmentId}.${ext}`,
         size: fileBytes.byteLength,
         userId: c.get("userId"),
-        name: randomUUID(),
+        name: "",
       });
     }
 
@@ -720,25 +792,52 @@ app.post("/api/v1/chat", async (c) => {
     images: string[];
   }[] = [];
 
+  let system = `You are an AI assistant.
+
+List of text attachments:
+`;
+
   for (const msg of chatMessages) {
     const chatAttachments = await db
-      .select({ mimeType: attachs.mimeType, path: attachs.path })
+      .select({
+        mimeType: attachs.mimeType,
+        path: attachs.path,
+        name: attachs.name,
+        id: attachs.id,
+        size: attachs.size,
+      })
       .from(messageAttachments)
       .innerJoin(attachs, eq(messageAttachments.attachmentId, attachs.id))
       .where(eq(messageAttachments.messageId, msg.id));
+
+    for (const attachment of chatAttachments) {
+      if (
+        attachment.mimeType.startsWith("text/") ||
+        attachment.mimeType == "application/json"
+      ) {
+        system += `
+ - ID: ${attachment.id}
+   MIME: ${attachment.mimeType}
+   Size: ${attachment.size} bytes
+`;
+      }
+    }
 
     finalMessages.push({
       ...msg,
       images: chatAttachments.flatMap((img) => {
         if (img.mimeType.startsWith("image/")) {
           return [
-            Deno.readFileSync(img.path).toBase64({ alphabet: "base64url" }),
+            `data:${img.mimeType};base64,${Deno.readFileSync(img.path).toBase64()}`,
           ];
         }
         return [];
       }),
     });
   }
+
+  system += `
+Use \`get_attachment\` tool to read their contents.`;
 
   return streamText(c, async (stream) => {
     let clientConnected = true;
@@ -774,8 +873,11 @@ app.post("/api/v1/chat", async (c) => {
       const response = startAgent(
         finalMessages as ChatMessage[],
         reqJson.model,
+        chatId,
+        c.get("userId"),
         16,
         [...defaultTools],
+        system,
       );
 
       let res = "";
