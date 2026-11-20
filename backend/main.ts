@@ -1519,6 +1519,16 @@ app.patch("/api/v1/admin/memoryModel", async (c) => {
       model: string;
     };
 
+    const availableModels = await getModels();
+
+    const exists = availableModels.some(
+      (m) => `${m.provider}/${m.name}` === model,
+    );
+
+    if (!exists) {
+      return c.json({ error: "Invalid memory model" }, 400);
+    }
+
     await db
       .insert(config)
       .values({ key: "memoryModel", value: model, updatedAt: new Date() })
