@@ -1730,6 +1730,14 @@ app.on(
 );
 
 setInterval(deleteExpiredSessions, 15 * 60 * 1000);
+setInterval(
+  () => {
+    for (const [id, status] of memoryCalls) {
+      if (status == "complete") memoryCalls.delete(id);
+    }
+  },
+  10 * 60 * 1000,
+);
 
 Deno.serve(
   {
