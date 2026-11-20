@@ -405,11 +405,130 @@ registerTool(
   },
 );
 
+const longtermMemorySystemPrompt = `You are a long-term memory editor.
+
+You receive:
+1. The current memory document.
+2. An instruction describing a requested change.
+
+Return the COMPLETE updated memory document.
+
+Rules:
+- Preserve information unrelated to the instruction.
+- Merge duplicate facts.
+- Replace outdated information when appropriate.
+- Remove information explicitly requested to be forgotten.
+- Never invent facts.
+- Keep the document concise and organized.
+- Do not include explanations or Markdown code fences.
+- Always write memories in the third person, referring to the user as "the user".
+- Write memories in English, regardless of the instruction's language.`;
+
+type MemoryCallStatus = "processing" | "complete";
+
+const memoryCalls = new Map<string, MemoryCallStatus>();
+
+async function updateMemory(userId: string, instruction: string) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const [user] = await db
+      .select({ memory: users.memory, memoryVersion: users.memoryVersion })
+      .from(users)
+      .where(eq(users.id, userId));
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const { memory, memoryVersion } = user;
+
+    const model = configuration.memoryModel;
+
+    if (!model) {
+      throw new Error(
+        "Memory update failed because the memory model is not configured. Inform the user that the memory was not saved, without exposing internal configuration details. Administrator action is required.",
+      );
+    }
+
+    const newMemory = await chat({
+      system: longtermMemorySystemPrompt,
+      model,
+      messages: [
+        {
+          role: "user",
+          content: `Current memory document:
+${memory || "(No memories stored yet)"}
+
+Requested change:
+${instruction}`,
+        },
+      ],
+    });
+
+    const result = await db
+      .update(users)
+      .set({
+        memory: newMemory,
+        memoryVersion: memoryVersion + 1,
+      })
+      .where(and(eq(users.id, userId), eq(users.memoryVersion, memoryVersion)))
+      .returning({ id: users.id });
+
+    if (result.length !== 0) {
+      return;
+    }
+  }
+
+  throw new Error("Memory update failed after 3 retries.");
+}
+
+registerTool(
+  async (args, _chatId, userId, messageId) => {
+    const { instruction } = JSON.parse(args);
+
+    const key = `${userId}:${messageId}`;
+
+    if (memoryCalls.has(key)) {
+      return JSON.stringify({
+        error: "Memory has already been changed for this message.",
+      });
+    }
+
+    memoryCalls.set(key, "processing");
+
+    try {
+      await updateMemory(userId, instruction);
+
+      memoryCalls.set(key, "complete");
+
+      return JSON.stringify({ success: true });
+    } catch (error) {
+      memoryCalls.delete(key);
+      throw error;
+    }
+  },
+  {
+    name: "update_memory",
+    parameters: {
+      type: "object",
+      properties: {
+        instruction: {
+          type: "string",
+          description: "Describe what should change in memory.",
+        },
+      },
+      required: ["instruction"],
+      additionalProperties: false,
+    },
+    description: "Add, update or remove information from long-term memory.",
+  },
+);
+
 const defaultTools = [
   "get_current_time",
   "web_search",
   "web_fetch",
   "get_attachment",
+  "update_memory",
 ];
 
 function parseDataUrl(dataUrl: string): {
@@ -429,7 +548,12 @@ function parseDataUrl(dataUrl: string): {
 }
 
 type AppEnv = {
-  Variables: { userId: string; sessionId: string; userRole: string };
+  Variables: {
+    userId: string;
+    sessionId: string;
+    userRole: string;
+    userMemory: string;
+  };
 };
 
 const app = new Hono<AppEnv>();
@@ -478,6 +602,7 @@ app.use("/api/v1/*", async (c, next) => {
     .where(eq(users.id, session[0].userId));
 
   c.set("userRole", user[0].role);
+  c.set("userMemory", user[0].memory);
 
   await next();
 });
@@ -837,7 +962,10 @@ List of text attachments:
   }
 
   system += `
-Use \`get_attachment\` tool to read their contents.`;
+Use \`get_attachment\` tool to read their contents.
+
+Memory document:
+${c.get("userMemory") || "(No memories stored yet)"}`;
 
   return streamText(c, async (stream) => {
     let clientConnected = true;
@@ -875,6 +1003,7 @@ Use \`get_attachment\` tool to read their contents.`;
         reqJson.model,
         chatId,
         c.get("userId"),
+        messageId,
         16,
         [...defaultTools],
         system,
@@ -1373,6 +1502,51 @@ app.patch("/api/v1/admin/model", async (c) => {
       });
 
     return c.text("Success");
+  } else {
+    return c.json(
+      {
+        error: "Forbidden",
+        message: "The user is not an administrator",
+      },
+      403,
+    );
+  }
+});
+
+app.patch("/api/v1/admin/memoryModel", async (c) => {
+  if (c.get("userRole") == "admin") {
+    const { model } = (await c.req.json()) as {
+      model: string;
+    };
+
+    await db
+      .insert(config)
+      .values({ key: "memoryModel", value: model, updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: config.key,
+        set: {
+          value: model,
+          updatedAt: new Date(),
+        },
+      });
+
+    configuration.memoryModel = model;
+
+    return c.text("Success");
+  } else {
+    return c.json(
+      {
+        error: "Forbidden",
+        message: "The user is not an administrator",
+      },
+      403,
+    );
+  }
+});
+
+app.get("/api/v1/admin/memoryModel", (c) => {
+  if (c.get("userRole") == "admin") {
+    return c.text(configuration.memoryModel);
   } else {
     return c.json(
       {

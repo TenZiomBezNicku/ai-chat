@@ -9,7 +9,12 @@ import {
 const tools: ToolDefinition[] = [];
 const functions: Map<
   string,
-  (args: string, chatId: string, userId: string) => Promise<string> | string
+  (
+    args: string,
+    chatId: string,
+    userId: string,
+    messageId: string,
+  ) => Promise<string> | string
 > = new Map();
 
 export function registerTool(
@@ -17,6 +22,7 @@ export function registerTool(
     args: string,
     chatId: string,
     userId: string,
+    messageId: string,
   ) => Promise<string> | string,
   tool: ToolDefinition,
 ) {
@@ -33,6 +39,7 @@ export async function* startAgent(
   model: string,
   chatId: string,
   userId: string,
+  messageId: string,
   maxTurns: number = 6,
   availableTools?: string[],
   system?: string,
@@ -95,7 +102,12 @@ export async function* startAgent(
       }
 
       try {
-        const result = await func(toolCall.arguments, chatId, userId);
+        const result = await func(
+          toolCall.arguments,
+          chatId,
+          userId,
+          messageId,
+        );
 
         history.push({
           role: "tool",

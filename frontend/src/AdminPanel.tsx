@@ -18,6 +18,7 @@ export default function AdminPanel() {
   const [llmApiKey, setLLMApiKey] = useState("");
   const [webApiKey, setWebApiKey] = useState("");
   const [namespace, setNamespace] = useState("");
+  const [memoryModel, setMemoryModel] = useState("");
   const [provider, setProvider] = useState("ollama");
   const [addingProvider, setAddingProvider] = useState(false);
   const [models, setModels] = useState<
@@ -45,6 +46,14 @@ export default function AdminPanel() {
       const json = await models.json();
 
       setModels(json);
+    })();
+
+    (async () => {
+      const response = await fetch("/api/v1/admin/memoryModel");
+
+      const memoryModel = await response.text();
+
+      setMemoryModel(memoryModel);
     })();
   }, []);
 
@@ -168,6 +177,37 @@ export default function AdminPanel() {
                   </div>
                 </div>
               ))}
+            </div>
+
+            <h3 className="text-xl">Memory Model</h3>
+            <div>
+              <ThemeProvider
+                theme={createTheme({
+                  palette: {
+                    mode: "dark",
+                  },
+                })}
+              >
+                <Select
+                  onChange={async (e) => {
+                    setMemoryModel(e.target.value);
+
+                    await fetch(`/api/v1/admin/memoryModel`, {
+                      method: "PATCH",
+                      body: JSON.stringify({
+                        model: e.target.value,
+                      }),
+                    });
+                  }}
+                  value={memoryModel}
+                >
+                  {models.map((m) => (
+                    <MenuItem
+                      value={`${m.provider}/${m.name}`}
+                    >{`${m.provider}/${m.name}`}</MenuItem>
+                  ))}
+                </Select>
+              </ThemeProvider>
             </div>
 
             <h3 className="text-xl">Web Search</h3>
